@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"gioui.org/op/clip"
 	"image/color"
 	"log"
 	"os"
@@ -23,86 +24,25 @@ import (
 )
 
 var (
-	screenshot = flag.String("screenshot", "", "save a screenshot to a file and exit")
-	disable    = flag.Bool("disable", false, "disable all widgets")
+	disable = flag.Bool("disable", false, "disable all widgets")
 )
 
-type iconAndTextButton struct {
-	theme  *material.Theme
-	button *widget.Clickable
-	icon   *widget.Icon
-	word   string
-}
-
 type state struct {
-	currentScreen string
-	gameScreen    *gameScreenState
-	wgu           *wguctl.Fsm
-	connected     bool
-}
-
-type gameScreenState struct {
-	cards       []*CardData
-	activeCards []*CardData
-	cardRows    int
-	score       int
-	gameWon     bool
-}
-
-func (o *gameScreenState) checkWin() bool {
-	for _, card := range o.cards {
-		if !card.Found {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (o *gameScreenState) hideActiveCards() {
-	for _, card := range o.cards {
-		if !card.Found {
-			card.Toggled = false
-		}
-	}
-}
-
-func (o *gameScreenState) resetGame() {
-	o.cards = nil
-	for i := 0; i < o.cardRows*o.cardRows; i++ {
-		o.cards = append(o.cards, &CardData{
-			Clickable: new(widget.Clickable),
-			Toggled:   false,
-		})
-	}
-
-	for _, card := range o.cards {
-		card.Found = false
-		card.Toggled = false
-	}
-
-	o.activeCards = nil
-	o.score = 0
-	o.gameWon = false
-}
-
-type CardData struct {
-	Clickable *widget.Clickable
-	Toggled   bool
-	Found     bool
-	Shape     string
+	wgu       *wguctl.Fsm
+	connected bool
 }
 
 var (
-	button                  = new(widget.Clickable)
-	radioButtonsPlayerCount = new(widget.Enum)
-	radioButtonsGridSize    = new(widget.Enum)
-	list                    = &widget.List{
+	configEditor  = new(widget.Editor)
+	connectButton = new(widget.Clickable)
+	list          = &widget.List{
 		List: layout.List{
 			Axis: layout.Vertical,
 		},
 	}
 	whiteColor = color.NRGBA{A: 0xff, R: 255, G: 255, B: 255}
+	greyColor  = color.NRGBA{A: 0xff, R: 75, G: 75, B: 75}
+	redColor   = color.NRGBA{A: 0xff, R: 255, G: 0, B: 0}
 	bgColor    = color.NRGBA{A: 0xff, R: 30, G: 30, B: 30}
 )
 
@@ -117,13 +57,11 @@ func main() {
 		w := new(app.Window)
 		w.Option(
 			app.Size(unit.Dp(800), unit.Dp(600)),
-			app.Title("Memory Game"),
+			app.Title("wugui"),
 		)
 
 		s := &state{
-			currentScreen: "start",
-			gameScreen:    &gameScreenState{},
-			wgu:           wguctl.NewFsm(ctx),
+			wgu: wguctl.NewFsm(ctx),
 		}
 
 		err := loop(ctx, s, w)
@@ -173,13 +111,9 @@ func loop(ctx context.Context, s *state, w *app.Window) error {
 					gtx = gtx.Disabled()
 				}
 
-				// Fill background first
-				paint.Fill(gtx.Ops, bgColor)
+				paint.Fill(gtx.Ops, bgColor) // Fill background first
 
-				switch s.currentScreen {
-				case "start":
-					startScreen(ctx, s, gtx, th)
-				}
+				wuguiScreen(ctx, s, gtx, th)
 
 				e.Frame(gtx.Ops)
 			}
@@ -193,13 +127,13 @@ type (
 	C = layout.Context
 )
 
-func startScreen(ctx context.Context, s *state, gtx layout.Context, th *material.Theme) layout.Dimensions {
+func wuguiScreen(ctx context.Context, s *state, gtx layout.Context, th *material.Theme) layout.Dimensions {
 	widgets := []layout.Widget{
 		func(gtx C) D {
 			return layout.Spacer{Height: unit.Dp(16)}.Layout(gtx)
 		},
 		func(gtx C) D {
-			l := material.H4(th, "wugui Welcome") // Memory Game Welcome
+			l := material.H4(th, "wugui welcome")
 			l.Color = whiteColor
 			l.State = new(widget.Selectable) // makes the text selectable
 			return l.Layout(gtx)
@@ -207,12 +141,43 @@ func startScreen(ctx context.Context, s *state, gtx layout.Context, th *material
 		func(gtx C) D {
 			return layout.Spacer{Height: unit.Dp(16)}.Layout(gtx)
 		},
-		func(gtx C) D { // button
+		func(gtx C) D {
+			// Fix the height to 200dp
+			h := gtx.Dp(unit.Dp(200))
+			gtx.Constraints.Min.Y = h
+			gtx.Constraints.Max.Y = h
+
+			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+				layout.Flexed(1, func(gtx C) D {
+					// Background color
+					bg := greyColor
+					rect := clip.Rect{Max: gtx.Constraints.Max}.Op()
+					paint.FillShape(gtx.Ops, bg, rect)
+
+					// Apply internal padding
+					in := layout.Inset{
+						Left:   unit.Dp(8),
+						Right:  unit.Dp(8),
+						Top:    unit.Dp(6),
+						Bottom: unit.Dp(6),
+					}
+					return in.Layout(gtx, func(gtx C) D {
+						ed := material.Editor(th, configEditor, "Enter config here")
+						ed.Color = whiteColor
+						return ed.Layout(gtx)
+					})
+				}),
+			)
+		},
+		func(gtx C) D {
+			return layout.Spacer{Height: unit.Dp(16)}.Layout(gtx)
+		},
+		func(gtx C) D {
 			in := layout.UniformInset(unit.Dp(8))
 			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 				layout.Rigid(func(gtx C) D {
 					return in.Layout(gtx, func(gtx C) D {
-						for button.Clicked(gtx) {
+						for connectButton.Clicked(gtx) {
 							wguState, _ := s.wgu.State()
 
 							switch wguState {
@@ -241,12 +206,17 @@ func startScreen(ctx context.Context, s *state, gtx layout.Context, th *material
 							_ = lastErr
 						}
 
-						btn := material.Button(th, button, label)
+						btn := material.Button(th, connectButton, label)
 						btn.Background = color.NRGBA{A: 0xff, R: 99, G: 96, B: 225} // purple button
 						return btn.Layout(gtx)
 					})
 				}),
 			)
+		},
+		func(gtx C) D {
+			errorMessage := material.Label(th, 12, "this is an error message")
+			errorMessage.Color = redColor
+			return errorMessage.Layout(gtx)
 		},
 	}
 
