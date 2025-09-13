@@ -12,6 +12,8 @@ const (
 	DisconnectedFsmState
 	ConnectedFsmState
 	ErrorFsmState
+	DisconnectingFsmState
+	ConnectingFsmState
 )
 
 func NewFsm(ctx context.Context) *Fsm {
@@ -33,6 +35,24 @@ type Fsm struct {
 	lastError error
 }
 
+func (o *Fsm) Connect(ctx context.Context, config WguConfig) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case o.events <- connectFsmEvent{config: config}:
+		return nil
+	}
+}
+
+func (o *Fsm) Disconnect(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case o.events <- disconnectFsmEvent{}:
+		return nil
+	}
+}
+
 type connectFsmEvent struct {
 	config WguConfig
 }
@@ -44,6 +64,9 @@ func (o *Fsm) loop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			if o.wgu != nil {
+				_ = o.disconnect(ctx)
+			}
 			return
 		case e := <-o.events:
 			o.processEvent(ctx, e)
@@ -54,6 +77,10 @@ func (o *Fsm) loop(ctx context.Context) {
 func (o *Fsm) processEvent(ctx context.Context, event interface{}) {
 	switch e := event.(type) {
 	case connectFsmEvent:
+		o.rwMutex.Lock()
+		o.state = ConnectingFsmState
+		o.rwMutex.Unlock()
+
 		err := o.connect(ctx, e.config)
 
 		o.rwMutex.Lock()
@@ -67,6 +94,10 @@ func (o *Fsm) processEvent(ctx context.Context, event interface{}) {
 			o.lastError = nil
 		}
 	case disconnectFsmEvent:
+		o.rwMutex.Lock()
+		o.state = DisconnectingFsmState
+		o.rwMutex.Unlock()
+
 		err := o.disconnect(ctx)
 
 		o.rwMutex.Lock()

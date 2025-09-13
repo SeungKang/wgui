@@ -6,6 +6,8 @@ import (
 	"image/color"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"wugui/internal/wguctl"
 
 	"gioui.org/app"
@@ -35,7 +37,7 @@ type iconAndTextButton struct {
 type state struct {
 	currentScreen string
 	gameScreen    *gameScreenState
-	wgu           *wguctl.Wgu
+	wgu           *wguctl.Fsm
 	connected     bool
 }
 
@@ -107,8 +109,9 @@ var (
 func main() {
 	flag.Parse()
 
-	radioButtonsPlayerCount.Value = "r1" // default
-	radioButtonsGridSize.Value = "4"     // default
+	ctx, cancelFn := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+	defer cancelFn()
 
 	go func() {
 		w := new(app.Window)
@@ -116,20 +119,29 @@ func main() {
 			app.Size(unit.Dp(800), unit.Dp(600)),
 			app.Title("Memory Game"),
 		)
-		if err := loop(w); err != nil {
+
+		s := &state{
+			currentScreen: "start",
+			gameScreen:    &gameScreenState{},
+			wgu:           wguctl.NewFsm(ctx),
+		}
+
+		err := loop(ctx, s, w)
+		cancelFn()
+
+		// TODO add method to FSM to kill wgu
+
+		if err != nil {
 			log.Fatal(err)
 		}
+
 		os.Exit(0)
 	}()
+
 	app.Main()
 }
 
-func loop(w *app.Window) error {
-	s := state{
-		currentScreen: "start",
-		gameScreen:    &gameScreenState{},
-	}
-
+func loop(ctx context.Context, s *state, w *app.Window) error {
 	th := material.NewTheme()
 	th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
 
@@ -166,7 +178,7 @@ func loop(w *app.Window) error {
 
 				switch s.currentScreen {
 				case "start":
-					startScreen(&s, gtx, th)
+					startScreen(ctx, s, gtx, th)
 				}
 
 				e.Frame(gtx.Ops)
@@ -181,7 +193,7 @@ type (
 	C = layout.Context
 )
 
-func startScreen(s *state, gtx layout.Context, th *material.Theme) layout.Dimensions {
+func startScreen(ctx context.Context, s *state, gtx layout.Context, th *material.Theme) layout.Dimensions {
 	widgets := []layout.Widget{
 		func(gtx C) D {
 			return layout.Spacer{Height: unit.Dp(16)}.Layout(gtx)
@@ -201,22 +213,35 @@ func startScreen(s *state, gtx layout.Context, th *material.Theme) layout.Dimens
 				layout.Rigid(func(gtx C) D {
 					return in.Layout(gtx, func(gtx C) D {
 						for button.Clicked(gtx) {
-							if !s.connected {
-								wgu, err := wguctl.StartWgu(context.Background(), wguctl.WguConfig{ConfigPath: "/home/kang_/.wgu/testing/peer1/wgu.conf"})
-								if err != nil {
-									return layout.Dimensions{}
-								}
+							wguState, _ := s.wgu.State()
 
-								s.wgu = wgu
-								s.connected = true
+							switch wguState {
+							case wguctl.ConnectedFsmState, wguctl.ConnectingFsmState:
+								_ = s.wgu.Disconnect(ctx)
+							default:
+								_ = s.wgu.Connect(ctx, wguctl.WguConfig{ConfigPath: "/Users/kang_/.wgu/gamingbsd.conf"})
 							}
-
-							go func() {
-
-							}()
-
 						}
-						btn := material.Button(th, button, "Connect")
+
+						var label string
+
+						wguState, lastErr := s.wgu.State()
+
+						switch wguState {
+						case wguctl.DisconnectingFsmState:
+							label = "Disconnecting..."
+						case wguctl.DisconnectedFsmState:
+							label = "Connect"
+						case wguctl.ConnectingFsmState:
+							label = "Connecting..."
+						case wguctl.ConnectedFsmState:
+							label = "Disconnect"
+						case wguctl.ErrorFsmState:
+							label = "Error"
+							_ = lastErr
+						}
+
+						btn := material.Button(th, button, label)
 						btn.Background = color.NRGBA{A: 0xff, R: 99, G: 96, B: 225} // purple button
 						return btn.Layout(gtx)
 					})
