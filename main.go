@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 	"wugui/internal/wguctl"
 
 	"gioui.org/app"
@@ -67,7 +68,10 @@ func main() {
 		err := loop(ctx, s, w)
 		cancelFn()
 
-		// TODO add method to FSM to kill wgu
+		select {
+		case <-time.After(2 * time.Second):
+		case <-s.wgu.Done():
+		}
 
 		if err != nil {
 			log.Fatal(err)
@@ -100,6 +104,8 @@ func loop(ctx context.Context, s *state, w *app.Window) error {
 	var ops op.Ops
 	for {
 		select {
+		case <-ctx.Done():
+			return ctx.Err()
 		case e := <-events:
 			switch e := e.(type) {
 			case app.DestroyEvent:

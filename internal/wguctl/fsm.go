@@ -20,6 +20,7 @@ func NewFsm(ctx context.Context) *Fsm {
 	fsm := &Fsm{
 		events: make(chan interface{}, 10),
 		state:  DisconnectedFsmState,
+		done:   make(chan struct{}),
 	}
 
 	go fsm.loop(ctx)
@@ -33,6 +34,7 @@ type Fsm struct {
 	rwMutex   sync.RWMutex
 	state     FsmState
 	lastError error
+	done      chan struct{}
 }
 
 func (o *Fsm) Connect(ctx context.Context, config WguConfig) error {
@@ -61,6 +63,8 @@ type disconnectFsmEvent struct {
 }
 
 func (o *Fsm) loop(ctx context.Context) {
+	defer close(o.done)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -72,6 +76,10 @@ func (o *Fsm) loop(ctx context.Context) {
 			o.processEvent(ctx, e)
 		}
 	}
+}
+
+func (o *Fsm) Done() <-chan struct{} {
+	return o.done
 }
 
 func (o *Fsm) processEvent(ctx context.Context, event interface{}) {
