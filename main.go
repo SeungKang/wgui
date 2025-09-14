@@ -24,23 +24,16 @@ import (
 	"gioui.org/widget/material"
 )
 
-var (
-	disable = flag.Bool("disable", false, "disable all widgets")
-)
-
 type state struct {
-	wgu       *wguctl.Fsm
-	connected bool
+	wgu           *wguctl.Fsm
+	connected     bool
+	configEditor  *widget.Editor
+	connectButton *widget.Clickable
+	list          *widget.List
+	theme         *material.Theme
 }
 
 var (
-	configEditor  = new(widget.Editor)
-	connectButton = new(widget.Clickable)
-	list          = &widget.List{
-		List: layout.List{
-			Axis: layout.Vertical,
-		},
-	}
 	whiteColor = color.NRGBA{A: 0xff, R: 255, G: 255, B: 255}
 	greyColor  = color.NRGBA{A: 0xff, R: 75, G: 75, B: 75}
 	redColor   = color.NRGBA{A: 0xff, R: 255, G: 0, B: 0}
@@ -62,10 +55,20 @@ func main() {
 		)
 
 		s := &state{
-			wgu: wguctl.NewFsm(ctx),
+			wgu:           wguctl.NewFsm(ctx),
+			configEditor:  new(widget.Editor),
+			connectButton: new(widget.Clickable),
+			list: &widget.List{
+				List: layout.List{
+					Axis: layout.Vertical,
+				},
+			},
+			theme: material.NewTheme(),
 		}
 
-		err := loop(ctx, s, w)
+		s.theme.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
+
+		err := s.loop(ctx, w)
 		cancelFn()
 
 		select {
@@ -83,10 +86,7 @@ func main() {
 	app.Main()
 }
 
-func loop(ctx context.Context, s *state, w *app.Window) error {
-	th := material.NewTheme()
-	th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
-
+func (o *state) loop(ctx context.Context, w *app.Window) error {
 	events := make(chan event.Event)
 	acks := make(chan struct{})
 
@@ -95,7 +95,8 @@ func loop(ctx context.Context, s *state, w *app.Window) error {
 			ev := w.Event()
 			events <- ev
 			<-acks
-			if _, ok := ev.(app.DestroyEvent); ok {
+			_, ok := ev.(app.DestroyEvent)
+			if ok {
 				return
 			}
 		}
@@ -113,16 +114,10 @@ func loop(ctx context.Context, s *state, w *app.Window) error {
 				return e.Err
 			case app.FrameEvent:
 				gtx := app.NewContext(&ops, e)
-				if *disable {
-					gtx = gtx.Disabled()
-				}
-
-				paint.Fill(gtx.Ops, bgColor) // Fill background first
-
-				wuguiScreen(ctx, s, gtx, th)
-
+				o.onFrame(ctx, gtx)
 				e.Frame(gtx.Ops)
 			}
+
 			acks <- struct{}{}
 		}
 	}
@@ -133,13 +128,15 @@ type (
 	C = layout.Context
 )
 
-func wuguiScreen(ctx context.Context, s *state, gtx layout.Context, th *material.Theme) layout.Dimensions {
+func (o *state) onFrame(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	paint.Fill(gtx.Ops, bgColor) // Fill background first
+
 	widgets := []layout.Widget{
 		func(gtx C) D {
 			return layout.Spacer{Height: unit.Dp(16)}.Layout(gtx)
 		},
 		func(gtx C) D {
-			l := material.H4(th, "wugui welcome")
+			l := material.H4(o.theme, "wugui welcome")
 			l.Color = whiteColor
 			l.State = new(widget.Selectable) // makes the text selectable
 			return l.Layout(gtx)
@@ -167,8 +164,24 @@ func wuguiScreen(ctx context.Context, s *state, gtx layout.Context, th *material
 						Top:    unit.Dp(6),
 						Bottom: unit.Dp(6),
 					}
+
+					for {
+						updateEvent, ok := o.configEditor.Update(gtx)
+						if !ok {
+							break
+						}
+
+						if _, ok := updateEvent.(widget.ChangeEvent); ok {
+							var err error
+							if err != nil {
+								// TODO(jfm): display UI element explaining the error to the user.
+								log.Printf("error: rendering markdown: %v", err)
+							}
+						}
+					}
+
 					return in.Layout(gtx, func(gtx C) D {
-						ed := material.Editor(th, configEditor, "Enter config here")
+						ed := material.Editor(o.theme, o.configEditor, "Enter config here")
 						ed.Color = whiteColor
 						return ed.Layout(gtx)
 					})
@@ -183,20 +196,20 @@ func wuguiScreen(ctx context.Context, s *state, gtx layout.Context, th *material
 			return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 				layout.Rigid(func(gtx C) D {
 					return in.Layout(gtx, func(gtx C) D {
-						for connectButton.Clicked(gtx) {
-							wguState, _ := s.wgu.State()
+						for o.connectButton.Clicked(gtx) {
+							wguState, _ := o.wgu.State()
 
 							switch wguState {
 							case wguctl.ConnectedFsmState, wguctl.ConnectingFsmState:
-								_ = s.wgu.Disconnect(ctx)
+								_ = o.wgu.Disconnect(ctx)
 							default:
-								_ = s.wgu.Connect(ctx, wguctl.WguConfig{ConfigPath: "/Users/kang_/.wgu/gamingbsd.conf"})
+								_ = o.wgu.Connect(ctx, wguctl.WguConfig{ConfigPath: "/Users/kang_/.wgu/gamingbsd.conf"})
 							}
 						}
 
 						var label string
 
-						wguState, lastErr := s.wgu.State()
+						wguState, lastErr := o.wgu.State()
 
 						switch wguState {
 						case wguctl.DisconnectingFsmState:
@@ -212,7 +225,7 @@ func wuguiScreen(ctx context.Context, s *state, gtx layout.Context, th *material
 							_ = lastErr
 						}
 
-						btn := material.Button(th, connectButton, label)
+						btn := material.Button(o.theme, o.connectButton, label)
 						btn.Background = color.NRGBA{A: 0xff, R: 99, G: 96, B: 225} // purple button
 						return btn.Layout(gtx)
 					})
@@ -220,13 +233,13 @@ func wuguiScreen(ctx context.Context, s *state, gtx layout.Context, th *material
 			)
 		},
 		func(gtx C) D {
-			errorMessage := material.Label(th, 12, "this is an error message")
+			errorMessage := material.Label(o.theme, 12, "this is an error message")
 			errorMessage.Color = redColor
 			return errorMessage.Layout(gtx)
 		},
 	}
 
-	return material.List(th, list).Layout(gtx, len(widgets), func(gtx C, i int) D {
+	return material.List(o.theme, o.list).Layout(gtx, len(widgets), func(gtx C, i int) D {
 		return layout.Center.Layout(gtx, func(gtx C) D {
 			return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
 		})
