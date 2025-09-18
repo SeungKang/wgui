@@ -80,7 +80,9 @@ func (s *State) renderWireguardButton(ctx context.Context, gtx layout.Context) l
 		case wguctl.ConnectedFsmState, wguctl.ConnectingFsmState:
 			_ = s.wgu.Disconnect(ctx)
 		default:
-			_ = s.wgu.Connect(ctx, wguctl.WguConfig{ConfigPath: "/Users/kang_/.wgu/gamingbsd.conf"})
+			profileName := s.profiles[s.selectedProfile]
+			configPath := s.GetProfilePath(profileName)
+			_ = s.wgu.Connect(ctx, wguctl.WguConfig{ConfigPath: configPath})
 		}
 	})
 }

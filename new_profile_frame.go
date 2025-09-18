@@ -2,78 +2,113 @@ package main
 
 import (
 	"context"
-	"gioui.org/layout"
-	"gioui.org/op/paint"
-	"gioui.org/unit"
-	"gioui.org/widget"
-	"gioui.org/widget/material"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
+
+	"gioui.org/layout"
+	"gioui.org/op/paint"
+	"gioui.org/text"
+	"gioui.org/unit"
+	"gioui.org/widget"
+	"gioui.org/widget/material"
 )
 
 func (s *State) renderNewProfileFrame(ctx context.Context, gtx layout.Context) layout.Dimensions {
-	paint.Fill(gtx.Ops, BgColor) // Fill background first
+	paint.Fill(gtx.Ops, BgColor)
 
 	widgets := []layout.Widget{
-		func(gtx C) D {
-			return s.renderSpacer(gtx, unit.Dp(16))
-		},
-		func(gtx C) D {
-			return s.renderTextEditor(gtx, s.profileNameEditor, "Enter profile here", unit.Dp(80))
-		},
-		func(gtx C) D {
-			return s.renderSpacer(gtx, unit.Dp(16))
-		},
-		func(gtx C) D {
-			return s.renderTextEditor(gtx, s.configEditor, "Enter config here", unit.Dp(200))
-		},
-		func(gtx C) D {
-			return s.renderButton(ctx, gtx, "Save", func() {
-				name := strings.TrimSpace(filepath.Base(s.profileNameEditor.Text()))
-				configPath := filepath.Join(s.configDirPath, name+".conf")
+		func(gtx C) D { return s.renderSpacer(gtx, unit.Dp(16)) },
+		s.formField("Name", s.profileNameEditor, unit.Dp(80)),
+		s.formField("Config", s.configEditor, unit.Dp(200)),
 
-				data := s.configEditor.Text()
-				if !strings.HasSuffix(data, "\n") {
-					data += "\n"
-				}
-
-				err := os.WriteFile(configPath, []byte(data), 0600)
-				if err != nil {
-					// TODO need a message box
-					log.Fatal(err)
-				}
-
-				s.AddProfile(name)
-
-				s.selectedProfile = len(s.profiles) - 1
-			})
-		},
 		func(gtx C) D {
-			return s.renderErrorMessage(gtx, "this is an error message")
+			return s.renderButton(ctx, gtx, "Save", func() { s.saveNewProfile() })
 		},
+		func(gtx C) D { return s.renderErrorMessage(gtx, "this is an error message") },
 	}
 
-	// --- LAYOUT: Sidebar (left) + Main (right) ---
 	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-		// LEFT: Sidebar column (fixed width)
-		layout.Rigid(func(gtx C) D {
-			return s.renderSidebar(gtx)
-		}),
-
-		// RIGHT: Your existing scrollable content
+		layout.Rigid(func(gtx C) D { return s.renderSidebar(gtx) }),
 		layout.Flexed(1, func(gtx C) D {
-			return material.List(s.theme, s.list).Layout(gtx, len(widgets), func(gtx C, i int) D {
-				return layout.Center.Layout(gtx, func(gtx C) D {
+			return material.List(s.theme, s.list).Layout(gtx, len(widgets),
+				func(gtx C, i int) D {
+					// Left-aligned content with padding
 					return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
 				})
-			})
 		}),
 	)
 }
 
-// Handle editor updates for the new profile frame
+// Replaces the separate label/editor widgets with a grouped field
+func (s *State) formField(label string, ed *widget.Editor, h unit.Dp) layout.Widget {
+	return func(gtx C) D {
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			// Label (left-aligned) with a small gap to the editor
+			layout.Rigid(func(gtx C) D {
+				l := material.Label(s.theme, 16, label)
+				l.Color = WhiteColor
+				l.Alignment = text.Start // left align
+				return layout.Inset{Bottom: unit.Dp(4)}.Layout(gtx, l.Layout)
+			}),
+			// Editor
+			layout.Rigid(func(gtx C) D {
+				return s.renderTextEditor(gtx, ed, "", h)
+			}),
+		)
+	}
+}
+
+func (s *State) saveNewProfile() {
+	profileName := s.profileNameEditor.Text()
+	configContent := s.configEditor.Text()
+
+	if profileName == "" || configContent == "" {
+		log.Printf("Profile name or config content is empty")
+		return
+	}
+
+	// Get user home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Error getting home directory: %v", err)
+		return
+	}
+
+	wguDir := filepath.Join(homeDir, ".wgu")
+
+	// Create .wgu directory if it doesn't exist
+	if err := os.MkdirAll(wguDir, 0755); err != nil {
+		log.Printf("Error creating .wgu directory: %v", err)
+		return
+	}
+
+	// Create the config file path
+	configPath := filepath.Join(wguDir, profileName+".conf")
+
+	// Write the config to file
+	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+		log.Printf("Error saving config file: %v", err)
+		return
+	}
+
+	// log.Printf("Saved profile '%s' to %s", profileName, configPath)
+
+	// Clear the editors
+	s.profileNameEditor.SetText("")
+	s.configEditor.SetText("")
+
+	// Refresh the profiles list
+	s.RefreshProfiles()
+
+	// Switch to the newly created profile (it will be in the sorted list, not at the end)
+	for i, profile := range s.profiles {
+		if profile == profileName {
+			s.selectedProfile = i
+			break
+		}
+	}
+}
 func (s *State) handleNewProfileEditorUpdates(gtx layout.Context) {
 	// Profile name editor updates
 	for {
