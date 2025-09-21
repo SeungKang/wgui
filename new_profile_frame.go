@@ -23,13 +23,14 @@ func (s *State) renderNewProfileFrame(ctx context.Context, gtx layout.Context) l
 		s.formField("Config", s.configEditor, unit.Dp(200)),
 
 		func(gtx C) D {
-			return s.renderButton(ctx, gtx, "Save", func() { s.saveNewProfile() })
+			return s.renderButton(ctx, gtx, "Save", PurpleColor, s.saveNewProfile)
 		},
+
 		func(gtx C) D { return s.renderErrorMessage(gtx, "this is an error message") },
 	}
 
 	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-		layout.Rigid(func(gtx C) D { return s.renderSidebar(gtx) }),
+		layout.Rigid(func(gtx C) D { return s.renderSidebar(ctx, gtx) }),
 		layout.Flexed(1, func(gtx C) D {
 			return material.List(s.theme, s.list).Layout(gtx, len(widgets),
 				func(gtx C, i int) D {
@@ -102,9 +103,9 @@ func (s *State) saveNewProfile() {
 	s.RefreshProfiles()
 
 	// Switch to the newly created profile (it will be in the sorted list, not at the end)
-	for i, profile := range s.profiles {
-		if profile == profileName {
-			s.selectedProfile = i
+	for i, profile := range s.profiles.profiles {
+		if profile.name == profileName {
+			s.profiles.selectedProfile = i
 			break
 		}
 	}

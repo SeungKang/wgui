@@ -37,7 +37,7 @@ type Fsm struct {
 	done      chan struct{}
 }
 
-func (o *Fsm) Connect(ctx context.Context, config WguConfig) error {
+func (o *Fsm) Connect(ctx context.Context, config Config) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -56,7 +56,7 @@ func (o *Fsm) Disconnect(ctx context.Context) error {
 }
 
 type connectFsmEvent struct {
-	config WguConfig
+	config Config
 }
 
 type disconnectFsmEvent struct {
@@ -121,7 +121,7 @@ func (o *Fsm) processEvent(ctx context.Context, event interface{}) {
 	}
 }
 
-func (o *Fsm) connect(ctx context.Context, config WguConfig) error {
+func (o *Fsm) connect(ctx context.Context, config Config) error {
 	if o.wgu != nil {
 		_ = o.wgu.Stop()
 		o.wgu = nil

@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-
 	"gioui.org/layout"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
+	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"image/color"
 )
 
 type (
@@ -16,7 +17,7 @@ type (
 	C = layout.Context
 )
 
-func (s *State) renderSidebar(gtx layout.Context) layout.Dimensions {
+func (s *State) renderSidebar(ctx context.Context, gtx layout.Context) layout.Dimensions {
 	width := gtx.Dp(unit.Dp(200))
 	gtx.Constraints.Min.X, gtx.Constraints.Max.X = width, width
 
@@ -26,9 +27,14 @@ func (s *State) renderSidebar(gtx layout.Context) layout.Dimensions {
 
 	in := layout.UniformInset(unit.Dp(8))
 	return in.Layout(gtx, func(gtx C) D {
-		return material.List(s.theme, s.sidebarList).Layout(gtx, len(s.profiles), func(gtx C, i int) D {
-			for s.profileClicks[i].Clicked(gtx) {
-				s.selectedProfile = i
+		return material.List(s.theme, s.profiles.profileList).Layout(gtx, len(s.profiles.profiles), func(gtx C, i int) D {
+			for s.profiles.profileClicks[i].Clicked(gtx) {
+				err := s.profiles.profiles[i].refresh(ctx, s.wguExePath)
+				if err != nil {
+					s.errLogger.Printf("failed to refresh profile %s - %v", s.profiles.profiles[i].name, err)
+				}
+
+				s.profiles.selectedProfile = i
 				if s.win != nil {
 					s.win.Invalidate() // request a new frame now
 				}
@@ -37,24 +43,24 @@ func (s *State) renderSidebar(gtx layout.Context) layout.Dimensions {
 			// Row styling (highlight selected)
 			row := func(gtx C) D {
 				// background for selected row
-				if i == s.selectedProfile {
+				if i == s.profiles.selectedProfile {
 					paint.FillShape(gtx.Ops, SelectedBg, clip.Rect{Max: gtx.Constraints.Max}.Op())
 				}
 
 				pad := layout.Inset{Top: unit.Dp(6), Bottom: unit.Dp(6), Left: unit.Dp(8), Right: unit.Dp(8)}
 				return pad.Layout(gtx, func(gtx C) D {
-					lbl := material.Body1(s.theme, s.profiles[i])
-					if i == s.selectedProfile {
+					lbl := material.Body1(s.theme, s.profiles.profiles[i].name)
+					if i == s.profiles.selectedProfile {
 						lbl.Color = WhiteColor
 					} else {
-						lbl.Color = LightGrey
+						lbl.Color = LightGreyColor
 					}
 					return lbl.Layout(gtx)
 				})
 			}
 
 			// Make the whole row clickable
-			return s.profileClicks[i].Layout(gtx, row)
+			return s.profiles.profileClicks[i].Layout(gtx, row)
 		})
 	})
 }
@@ -94,8 +100,8 @@ func (s *State) renderTextEditor(gtx layout.Context, editor *widget.Editor, plac
 	)
 }
 
-func (s *State) renderButton(ctx context.Context, gtx layout.Context, label string, onClick func()) layout.Dimensions {
-	in := layout.UniformInset(unit.Dp(8))
+func (s *State) renderButton(ctx context.Context, gtx layout.Context, label string, color color.NRGBA, onClick func()) layout.Dimensions {
+	in := layout.UniformInset(unit.Dp(0))
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(func(gtx C) D {
 			return in.Layout(gtx, func(gtx C) D {
@@ -104,17 +110,30 @@ func (s *State) renderButton(ctx context.Context, gtx layout.Context, label stri
 				}
 
 				btn := material.Button(s.theme, s.connectButton, label)
-				btn.Background = PurpleBtn
+				btn.Background = color
 				return btn.Layout(gtx)
 			})
 		}),
 	)
 }
 
+func (s *State) renderLogs(gtx layout.Context) layout.Dimensions {
+	logsBody := material.Body1(s.theme, "this is a message body")
+	logsBody.Color = WhiteColor
+	logsBody.Alignment = text.Start
+	return logsBody.Layout(gtx)
+}
+
 func (s *State) renderErrorMessage(gtx layout.Context, message string) layout.Dimensions {
 	errorMessage := material.Label(s.theme, 12, message)
 	errorMessage.Color = RedColor
 	return errorMessage.Layout(gtx)
+}
+
+func (s *State) renderPubkey(gtx layout.Context, message string) layout.Dimensions {
+	pubkeyLabel := material.Label(s.theme, 16, message)
+	pubkeyLabel.Color = WhiteColor
+	return pubkeyLabel.Layout(gtx)
 }
 
 func (s *State) renderSpacer(gtx layout.Context, height unit.Dp) layout.Dimensions {

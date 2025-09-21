@@ -14,11 +14,20 @@ type Wgu struct {
 	stderr  chan string
 }
 
-type WguConfig struct {
+type Config struct {
+	ExePath    string
 	ConfigPath string
 }
 
-func StartWgu(ctx context.Context, config WguConfig) (*Wgu, error) {
+func (o *Config) GetExePath() string {
+	if o.ExePath == "" {
+		return "wgu"
+	}
+
+	return o.ExePath
+}
+
+func StartWgu(ctx context.Context, config Config) (*Wgu, error) {
 	wgu := exec.CommandContext(ctx, "wgu", "up", "-c", config.ConfigPath)
 
 	stdout, err := wgu.StdoutPipe()
