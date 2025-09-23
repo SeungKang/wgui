@@ -52,11 +52,31 @@ func (s *State) renderProfileFrame(ctx context.Context, gtx layout.Context) layo
 		},
 	}
 
-	// --- LAYOUT: Sidebar (left) + Main (right) ---
 	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
 		// LEFT: Sidebar column (fixed width)
 		layout.Rigid(func(gtx C) D {
-			return s.renderSidebar(ctx, gtx)
+			// Vertical stack: Button at top, then sidebar
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+				// Top button
+				layout.Rigid(func(gtx C) D {
+					in := layout.UniformInset(unit.Dp(8))
+
+					btn := material.Button(s.theme, s.newProfileButton, "New Profile")
+					btn.Background = PurpleColor
+
+					for s.newProfileButton.Clicked(gtx) {
+						s.frame = "new_profile_frame" // navigate to your new-profile UI
+						s.win.Invalidate()            // optional: force redraw
+					}
+
+					return in.Layout(gtx, btn.Layout)
+				}),
+
+				// Sidebar content
+				layout.Flexed(1, func(gtx C) D {
+					return s.renderSidebar(ctx, gtx)
+				}),
+			)
 		}),
 
 		// RIGHT: Your existing scrollable content

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"image/color"
+
 	"gioui.org/layout"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
@@ -9,7 +11,6 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
-	"image/color"
 )
 
 type (
@@ -34,6 +35,7 @@ func (s *State) renderSidebar(ctx context.Context, gtx layout.Context) layout.Di
 					s.errLogger.Printf("failed to refresh profile %s - %v", s.profiles.profiles[i].name, err)
 				}
 
+				s.frame = "profile_frame"
 				s.profiles.selectedProfile = i
 				if s.win != nil {
 					s.win.Invalidate() // request a new frame now

@@ -21,15 +21,19 @@ import (
 )
 
 type State struct {
-	wgu           *wguctl.Fsm
-	connected     bool
-	connectButton *widget.Clickable
-	list          *widget.List
-	theme         *material.Theme
-	win           *app.Window
-	wguDir        string
-	wguExePath    string
-	errLogger     *log.Logger
+	wgu              *wguctl.Fsm
+	connected        bool
+	connectButton    *widget.Clickable
+	newProfileButton *widget.Clickable
+	editButton       *widget.Clickable
+	deleteButton     *widget.Clickable
+	list             *widget.List
+	theme            *material.Theme
+	win              *app.Window
+	wguDir           string
+	wguExePath       string
+	errLogger        *log.Logger
+	frame            string
 
 	// new config
 	profileNameEditor *widget.Editor
@@ -72,9 +76,12 @@ func NewState(ctx context.Context, w *app.Window) *State {
 	}
 
 	s := &State{
-		wgu:           wguctl.NewFsm(ctx),
-		configEditor:  new(widget.Editor),
-		connectButton: new(widget.Clickable),
+		wgu:              wguctl.NewFsm(ctx),
+		configEditor:     new(widget.Editor),
+		connectButton:    new(widget.Clickable),
+		newProfileButton: new(widget.Clickable),
+		editButton:       new(widget.Clickable),
+		deleteButton:     new(widget.Clickable),
 		list: &widget.List{
 			List: layout.List{
 				Axis: layout.Vertical,
@@ -131,9 +138,10 @@ func (s *State) Run(ctx context.Context, w *app.Window) error {
 				return e.Err
 			case app.FrameEvent:
 				gtx := app.NewContext(&ops, e)
-				if s.profiles.profiles[s.profiles.selectedProfile].name == "+" {
+				switch s.frame {
+				case "new_profile_frame":
 					s.renderNewProfileFrame(ctx, gtx)
-				} else {
+				case "profile_frame":
 					s.renderProfileFrame(ctx, gtx)
 				}
 				e.Frame(gtx.Ops)
@@ -174,13 +182,14 @@ func (s *State) loadProfiles() error {
 		return profileConfigs[i].name < profileConfigs[j].name
 	})
 
-	// Initialize profiles with sorted profiles first, then "+" button at the end
-	s.profiles.profiles = make([]profileConfig, 0, len(profileConfigs)+1)
+	// Initialize profiles with sorted profiles
+	s.profiles.profiles = make([]profileConfig, 0, len(profileConfigs))
 	s.profiles.profiles = append(s.profiles.profiles, profileConfigs...)
-	s.profiles.profiles = append(s.profiles.profiles, profileConfig{
-		name:       "+",
-		configPath: "",
-	})
+	if len(profileConfigs) == 0 {
+		s.frame = "new_profile_frame"
+	} else {
+		s.frame = "profile_frame"
+	}
 
 	// Initialize clickable widgets for all profiles
 	s.profiles.profileClicks = make([]widget.Clickable, len(s.profiles.profiles))

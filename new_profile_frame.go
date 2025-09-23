@@ -30,13 +30,37 @@ func (s *State) renderNewProfileFrame(ctx context.Context, gtx layout.Context) l
 	}
 
 	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-		layout.Rigid(func(gtx C) D { return s.renderSidebar(ctx, gtx) }),
+		// LEFT: Sidebar column (fixed width)
+		layout.Rigid(func(gtx C) D {
+			// Vertical stack: Button at top, then sidebar
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+				// Top button
+				layout.Rigid(func(gtx C) D {
+					in := layout.UniformInset(unit.Dp(8))
+
+					btn := material.Button(s.theme, s.newProfileButton, "New Profile")
+					btn.Background = PurpleColor
+
+					for s.newProfileButton.Clicked(gtx) {
+						s.frame = "new_profile_frame" // navigate to your new-profile UI
+						s.win.Invalidate()            // optional: force redraw
+					}
+
+					return in.Layout(gtx, btn.Layout)
+				}),
+
+				// Sidebar content
+				layout.Flexed(1, func(gtx C) D {
+					return s.renderSidebar(ctx, gtx)
+				}),
+			)
+		}),
+
+		// RIGHT: Your existing scrollable content
 		layout.Flexed(1, func(gtx C) D {
-			return material.List(s.theme, s.list).Layout(gtx, len(widgets),
-				func(gtx C, i int) D {
-					// Left-aligned content with padding
-					return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
-				})
+			return material.List(s.theme, s.list).Layout(gtx, len(widgets), func(gtx C, i int) D {
+				return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
+			})
 		}),
 	)
 }
@@ -105,6 +129,7 @@ func (s *State) saveNewProfile() {
 	// Switch to the newly created profile (it will be in the sorted list, not at the end)
 	for i, profile := range s.profiles.profiles {
 		if profile.name == profileName {
+			s.frame = "profile_frame"
 			s.profiles.selectedProfile = i
 			break
 		}
