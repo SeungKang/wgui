@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -23,40 +22,19 @@ func (s *State) renderNewProfileFrame(ctx context.Context, gtx layout.Context) l
 		s.formField("Config", s.configEditor, unit.Dp(200)),
 
 		func(gtx C) D {
-			return s.renderButton(ctx, gtx, "Save", PurpleColor, s.saveNewProfile)
+			return s.renderButton(ctx, gtx, "Save", PurpleColor, s.saveButton, func() { s.saveNewProfile(ctx) })
 		},
 
 		func(gtx C) D { return s.renderErrorMessage(gtx, "this is an error message") },
 	}
 
 	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-		// LEFT: Sidebar column (fixed width)
+		// LEFT: Sidebar
 		layout.Rigid(func(gtx C) D {
-			// Vertical stack: Button at top, then sidebar
-			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				// Top button
-				layout.Rigid(func(gtx C) D {
-					in := layout.UniformInset(unit.Dp(8))
-
-					btn := material.Button(s.theme, s.newProfileButton, "New Profile")
-					btn.Background = PurpleColor
-
-					for s.newProfileButton.Clicked(gtx) {
-						s.frame = "new_profile_frame" // navigate to your new-profile UI
-						s.win.Invalidate()            // optional: force redraw
-					}
-
-					return in.Layout(gtx, btn.Layout)
-				}),
-
-				// Sidebar content
-				layout.Flexed(1, func(gtx C) D {
-					return s.renderSidebar(ctx, gtx)
-				}),
-			)
+			return s.renderSidebar(ctx, gtx)
 		}),
 
-		// RIGHT: Your existing scrollable content
+		// RIGHT: Main content
 		layout.Flexed(1, func(gtx C) D {
 			return material.List(s.theme, s.list).Layout(gtx, len(widgets), func(gtx C, i int) D {
 				return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
@@ -84,19 +62,19 @@ func (s *State) formField(label string, ed *widget.Editor, h unit.Dp) layout.Wid
 	}
 }
 
-func (s *State) saveNewProfile() {
+func (s *State) saveNewProfile(ctx context.Context) {
 	profileName := s.profileNameEditor.Text()
 	configContent := s.configEditor.Text()
 
 	if profileName == "" || configContent == "" {
-		log.Printf("Profile name or config content is empty")
+		s.errLogger.Printf("Profile name or config content is empty")
 		return
 	}
 
 	// Get user home directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		log.Printf("Error getting home directory: %v", err)
+		s.errLogger.Printf("Error getting home directory: %v", err)
 		return
 	}
 
@@ -104,7 +82,7 @@ func (s *State) saveNewProfile() {
 
 	// Create .wgu directory if it doesn't exist
 	if err := os.MkdirAll(wguDir, 0755); err != nil {
-		log.Printf("Error creating .wgu directory: %v", err)
+		s.errLogger.Printf("Error creating .wgu directory: %v", err)
 		return
 	}
 
@@ -113,24 +91,22 @@ func (s *State) saveNewProfile() {
 
 	// Write the config to file
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
-		log.Printf("Error saving config file: %v", err)
+		s.errLogger.Printf("Error saving config file: %v", err)
 		return
 	}
-
-	// log.Printf("Saved profile '%s' to %s", profileName, configPath)
 
 	// Clear the editors
 	s.profileNameEditor.SetText("")
 	s.configEditor.SetText("")
 
 	// Refresh the profiles list
-	s.RefreshProfiles()
+	s.RefreshProfiles(ctx)
 
 	// Switch to the newly created profile (it will be in the sorted list, not at the end)
 	for i, profile := range s.profiles.profiles {
 		if profile.name == profileName {
-			s.frame = "profile_frame"
 			s.profiles.selectedProfile = i
+			s.currentUiMode = viewProfileUiMode
 			break
 		}
 	}
@@ -146,7 +122,7 @@ func (s *State) handleNewProfileEditorUpdates(gtx layout.Context) {
 		if _, ok := updateEvent.(widget.ChangeEvent); ok {
 			var err error
 			if err != nil {
-				log.Printf("error: rendering markdown: %v", err)
+				s.errLogger.Printf("failed to render profile name editor - %v", err)
 			}
 		}
 	}
@@ -161,7 +137,7 @@ func (s *State) handleNewProfileEditorUpdates(gtx layout.Context) {
 		if _, ok := updateEvent.(widget.ChangeEvent); ok {
 			var err error
 			if err != nil {
-				log.Printf("error: rendering markdown: %v", err)
+				s.errLogger.Printf("failed to render config editor - %v", err)
 			}
 		}
 	}

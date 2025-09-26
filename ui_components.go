@@ -28,42 +28,59 @@ func (s *State) renderSidebar(ctx context.Context, gtx layout.Context) layout.Di
 
 	in := layout.UniformInset(unit.Dp(8))
 	return in.Layout(gtx, func(gtx C) D {
-		return material.List(s.theme, s.profiles.profileList).Layout(gtx, len(s.profiles.profiles), func(gtx C, i int) D {
-			for s.profiles.profileClicks[i].Clicked(gtx) {
-				err := s.profiles.profiles[i].refresh(ctx, s.wguExePath)
-				if err != nil {
-					s.errLogger.Printf("failed to refresh profile %s - %v", s.profiles.profiles[i].name, err)
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			// New profile button at top
+			layout.Rigid(func(gtx C) D {
+				btn := material.Button(s.theme, s.newProfileButton, "+")
+				btn.Background = PurpleColor
+
+				for s.newProfileButton.Clicked(gtx) {
+					s.profileNameEditor.SetText("")
+					s.configEditor.SetText("")
+					s.currentUiMode = newProfileUiMode
+					s.win.Invalidate()
 				}
 
-				s.frame = "profile_frame"
-				s.profiles.selectedProfile = i
-				if s.win != nil {
-					s.win.Invalidate() // request a new frame now
-				}
-			}
+				return btn.Layout(gtx)
+			}),
 
-			// Row styling (highlight selected)
-			row := func(gtx C) D {
-				// background for selected row
-				if i == s.profiles.selectedProfile {
-					paint.FillShape(gtx.Ops, SelectedBg, clip.Rect{Max: gtx.Constraints.Max}.Op())
-				}
+			// Spacing between button and list
+			layout.Rigid(func(gtx C) D {
+				return layout.Spacer{Height: unit.Dp(8)}.Layout(gtx)
+			}),
 
-				pad := layout.Inset{Top: unit.Dp(6), Bottom: unit.Dp(6), Left: unit.Dp(8), Right: unit.Dp(8)}
-				return pad.Layout(gtx, func(gtx C) D {
-					lbl := material.Body1(s.theme, s.profiles.profiles[i].name)
-					if i == s.profiles.selectedProfile {
-						lbl.Color = WhiteColor
-					} else {
-						lbl.Color = LightGreyColor
+			// Profile list below button
+			layout.Flexed(1, func(gtx C) D {
+				return material.List(s.theme, s.profiles.profileList).Layout(gtx, len(s.profiles.profiles), func(gtx C, i int) D {
+					for s.profiles.profileClicks[i].Clicked(gtx) {
+						err := s.profiles.profiles[i].refresh(ctx, s.wguExePath)
+						if err != nil {
+							s.errLogger.Printf("failed to refresh profile %s - %v", s.profiles.profiles[i].name, err)
+						}
+
+						s.profiles.selectedProfile = i
+						s.currentUiMode = viewProfileUiMode
+						s.win.Invalidate()
 					}
-					return lbl.Layout(gtx)
-				})
-			}
 
-			// Make the whole row clickable
-			return s.profiles.profileClicks[i].Layout(gtx, row)
-		})
+					// Row styling (highlight selected only when on profile frame)
+					row := func(gtx C) D {
+						if i == s.profiles.selectedProfile && s.currentUiMode != newProfileUiMode {
+							paint.FillShape(gtx.Ops, SelectedBg, clip.Rect{Max: gtx.Constraints.Max}.Op())
+						}
+
+						pad := layout.Inset{Top: unit.Dp(6), Bottom: unit.Dp(6), Left: unit.Dp(8), Right: unit.Dp(8)}
+						return pad.Layout(gtx, func(gtx C) D {
+							lbl := material.Body1(s.theme, s.profiles.profiles[i].name)
+							lbl.Color = WhiteColor
+							return lbl.Layout(gtx)
+						})
+					}
+
+					return s.profiles.profileClicks[i].Layout(gtx, row)
+				})
+			}),
+		)
 	})
 }
 
@@ -102,16 +119,16 @@ func (s *State) renderTextEditor(gtx layout.Context, editor *widget.Editor, plac
 	)
 }
 
-func (s *State) renderButton(ctx context.Context, gtx layout.Context, label string, color color.NRGBA, onClick func()) layout.Dimensions {
+func (s *State) renderButton(ctx context.Context, gtx layout.Context, label string, color color.NRGBA, button *widget.Clickable, onClick func()) layout.Dimensions {
 	in := layout.UniformInset(unit.Dp(0))
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(func(gtx C) D {
 			return in.Layout(gtx, func(gtx C) D {
-				for s.connectButton.Clicked(gtx) {
+				for button.Clicked(gtx) {
 					onClick()
 				}
 
-				btn := material.Button(s.theme, s.connectButton, label)
+				btn := material.Button(s.theme, button, label)
 				btn.Background = color
 				return btn.Layout(gtx)
 			})

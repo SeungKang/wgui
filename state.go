@@ -27,13 +27,15 @@ type State struct {
 	newProfileButton *widget.Clickable
 	editButton       *widget.Clickable
 	deleteButton     *widget.Clickable
-	list             *widget.List
-	theme            *material.Theme
-	win              *app.Window
-	wguDir           string
-	wguExePath       string
-	errLogger        *log.Logger
-	frame            string
+	saveButton       *widget.Clickable
+
+	list          *widget.List
+	theme         *material.Theme
+	win           *app.Window
+	wguDir        string
+	wguExePath    string
+	errLogger     *log.Logger
+	currentUiMode uiMode
 
 	// new config
 	profileNameEditor *widget.Editor
@@ -41,6 +43,14 @@ type State struct {
 
 	profiles *profileState
 }
+
+type uiMode int
+
+const (
+	newProfileUiMode uiMode = iota
+	editProfileUiMode
+	viewProfileUiMode
+)
 
 type profileState struct {
 	profileList     *widget.List
@@ -50,12 +60,20 @@ type profileState struct {
 }
 
 type profileConfig struct {
-	name       string
-	configPath string
-	pubkey     string
+	name           string
+	configPath     string
+	pubkey         string
+	lastReadConfig string
 }
 
 func (o *profileConfig) refresh(ctx context.Context, wguExePath string) error {
+	config, err := os.ReadFile(o.configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s - %v", o.configPath, err)
+	}
+
+	o.lastReadConfig = string(config)
+
 	pubkey, err := wguctl.GetPublicKeyFromConfig(ctx, wguctl.Config{
 		ExePath:    wguExePath,
 		ConfigPath: o.configPath,
@@ -82,6 +100,7 @@ func NewState(ctx context.Context, w *app.Window) *State {
 		newProfileButton: new(widget.Clickable),
 		editButton:       new(widget.Clickable),
 		deleteButton:     new(widget.Clickable),
+		saveButton:       new(widget.Clickable),
 		list: &widget.List{
 			List: layout.List{
 				Axis: layout.Vertical,
@@ -98,13 +117,18 @@ func NewState(ctx context.Context, w *app.Window) *State {
 		wguDir:            filepath.Join(homeDir, ".wgu"),
 		wguExePath:        "wgu",
 		errLogger:         log.Default(),
+		currentUiMode:     newProfileUiMode,
 	}
 
 	s.theme.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
 
-	err = s.loadProfiles()
+	err = s.loadProfiles(ctx)
 	if err != nil {
 		panic(err)
+	}
+
+	if len(s.profiles.profiles) > 0 {
+		s.currentUiMode = viewProfileUiMode
 	}
 
 	return s
@@ -138,12 +162,15 @@ func (s *State) Run(ctx context.Context, w *app.Window) error {
 				return e.Err
 			case app.FrameEvent:
 				gtx := app.NewContext(&ops, e)
-				switch s.frame {
-				case "new_profile_frame":
+				switch s.currentUiMode {
+				case newProfileUiMode:
 					s.renderNewProfileFrame(ctx, gtx)
-				case "profile_frame":
+				case editProfileUiMode:
+					s.renderNewProfileFrame(ctx, gtx)
+				case viewProfileUiMode:
 					s.renderProfileFrame(ctx, gtx)
 				}
+
 				e.Frame(gtx.Ops)
 			}
 
@@ -152,7 +179,7 @@ func (s *State) Run(ctx context.Context, w *app.Window) error {
 	}
 }
 
-func (s *State) loadProfiles() error {
+func (s *State) loadProfiles(ctx context.Context) error {
 	// Ensure .wgu directory exists
 	err := os.MkdirAll(s.wguDir, 0700)
 	if err != nil {
@@ -171,10 +198,14 @@ func (s *State) loadProfiles() error {
 	for _, path := range paths {
 		baseName := filepath.Base(path)
 		profileName := strings.TrimSuffix(baseName, ".conf")
-		profileConfigs = append(profileConfigs, profileConfig{
+		config := profileConfig{
 			name:       profileName,
 			configPath: path,
-		})
+		}
+
+		config.refresh(ctx, s.wguExePath)
+
+		profileConfigs = append(profileConfigs, config)
 	}
 
 	// Ensure consistent ordering
@@ -185,28 +216,24 @@ func (s *State) loadProfiles() error {
 	// Initialize profiles with sorted profiles
 	s.profiles.profiles = make([]profileConfig, 0, len(profileConfigs))
 	s.profiles.profiles = append(s.profiles.profiles, profileConfigs...)
-	if len(profileConfigs) == 0 {
-		s.frame = "new_profile_frame"
-	} else {
-		s.frame = "profile_frame"
-	}
 
 	// Initialize clickable widgets for all profiles
 	s.profiles.profileClicks = make([]widget.Clickable, len(s.profiles.profiles))
 
-	// Set initial selection - if we have profiles, select the first one; otherwise select "+"
+	// Set initial selection
 	s.profiles.selectedProfile = 0
 
 	return nil
 }
 
-func (s *State) RefreshProfiles() {
-	err := s.loadProfiles()
+func (s *State) RefreshProfiles(ctx context.Context) error {
+	err := s.loadProfiles(ctx)
 	if err != nil {
-		// Handle error appropriately - could log or show in UI
-		fmt.Printf("Error refreshing profiles: %v\n", err)
+		s.errLogger.Printf("Error refreshing profiles: %v", err)
 	}
 	if s.win != nil {
 		s.win.Invalidate()
 	}
+
+	return nil
 }

@@ -42,7 +42,7 @@ func (s *State) renderProfileFrame(ctx context.Context, gtx layout.Context) layo
 			return s.renderConnectButton(ctx, gtx, wguConfig)
 		},
 		func(gtx C) D {
-			return s.renderEditButton(ctx, gtx, wguConfig)
+			return s.renderEditButton(ctx, gtx)
 		},
 		func(gtx C) D {
 			return s.renderDeleteButton(ctx, gtx)
@@ -53,33 +53,12 @@ func (s *State) renderProfileFrame(ctx context.Context, gtx layout.Context) layo
 	}
 
 	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-		// LEFT: Sidebar column (fixed width)
+		// LEFT: Sidebar
 		layout.Rigid(func(gtx C) D {
-			// Vertical stack: Button at top, then sidebar
-			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				// Top button
-				layout.Rigid(func(gtx C) D {
-					in := layout.UniformInset(unit.Dp(8))
-
-					btn := material.Button(s.theme, s.newProfileButton, "New Profile")
-					btn.Background = PurpleColor
-
-					for s.newProfileButton.Clicked(gtx) {
-						s.frame = "new_profile_frame" // navigate to your new-profile UI
-						s.win.Invalidate()            // optional: force redraw
-					}
-
-					return in.Layout(gtx, btn.Layout)
-				}),
-
-				// Sidebar content
-				layout.Flexed(1, func(gtx C) D {
-					return s.renderSidebar(ctx, gtx)
-				}),
-			)
+			return s.renderSidebar(ctx, gtx)
 		}),
 
-		// RIGHT: Your existing scrollable content
+		// RIGHT: Main content
 		layout.Flexed(1, func(gtx C) D {
 			return material.List(s.theme, s.list).Layout(gtx, len(widgets), func(gtx C, i int) D {
 				return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
@@ -113,7 +92,7 @@ func (s *State) renderConnectButton(ctx context.Context, gtx layout.Context, con
 		_ = lastErr
 	}
 
-	return s.renderButton(ctx, gtx, label, PurpleColor, func() {
+	return s.renderButton(ctx, gtx, label, PurpleColor, s.connectButton, func() {
 		switch wguState {
 		case wguctl.ConnectedFsmState, wguctl.ConnectingFsmState:
 			_ = s.wgu.Disconnect(ctx)
@@ -123,19 +102,24 @@ func (s *State) renderConnectButton(ctx context.Context, gtx layout.Context, con
 	})
 }
 
-func (s *State) renderEditButton(ctx context.Context, gtx layout.Context, config wguctl.Config) layout.Dimensions {
-	return s.renderButton(ctx, gtx, "edit", RedColor, func() {
+func (s *State) renderEditButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	return s.renderButton(ctx, gtx, "edit", GreyColor, s.editButton, func() {
+		s.currentUiMode = editProfileUiMode
+
+		s.profileNameEditor.SetText(s.profiles.profiles[s.profiles.selectedProfile].name)
+		s.configEditor.SetText(s.profiles.profiles[s.profiles.selectedProfile].lastReadConfig)
 	})
 }
 
 func (s *State) renderDeleteButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
-	return s.renderButton(ctx, gtx, "delete", RedColor, func() {
+	return s.renderButton(ctx, gtx, "delete", RedColor, s.deleteButton, func() {
 		configPath := s.profiles.profiles[s.profiles.selectedProfile].configPath
 		err := os.Remove(configPath)
 		if err != nil {
 			s.errLogger.Printf("failed to remove wgu config file: %q - %v", configPath, err)
 		}
 
-		s.win.Invalidate()
+		// Refresh the profiles list
+		s.RefreshProfiles(ctx)
 	})
 }
