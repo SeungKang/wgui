@@ -16,8 +16,13 @@ const (
 	ConnectingFsmState
 )
 
-func NewFsm(ctx context.Context) *Fsm {
+type FsmConfig struct {
+	OnNewStderr func(ctx context.Context)
+}
+
+func NewFsm(ctx context.Context, config FsmConfig) *Fsm {
 	fsm := &Fsm{
+		config:   config,
 		events:   make(chan interface{}, 10),
 		state:    DisconnectedFsmState,
 		stderrCh: make(chan string),
@@ -32,6 +37,7 @@ func NewFsm(ctx context.Context) *Fsm {
 }
 
 type Fsm struct {
+	config     FsmConfig
 	wgu        *Wgu
 	events     chan interface{}
 	rwMutex    sync.RWMutex
@@ -175,6 +181,10 @@ func (o *Fsm) handleStderr(ctx context.Context) {
 			o.stderr += line + "\n"
 
 			o.stderrRWMu.Unlock()
+
+			if o.config.OnNewStderr != nil {
+				o.config.OnNewStderr(ctx)
+			}
 		}
 	}
 }

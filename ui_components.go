@@ -29,8 +29,11 @@ func (s *State) renderSidebar(ctx context.Context, gtx layout.Context) layout.Di
 	in := layout.UniformInset(unit.Dp(8))
 	return in.Layout(gtx, func(gtx C) D {
 		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-			// New profile button at top
 			layout.Rigid(func(gtx C) D {
+				// Set fixed width for the button
+				btnWidth := gtx.Dp(40)
+				gtx.Constraints.Min.X, gtx.Constraints.Max.X = btnWidth, btnWidth
+
 				btn := material.Button(s.theme, s.newProfileButton, "+")
 				btn.Background = PurpleColor
 
@@ -58,14 +61,14 @@ func (s *State) renderSidebar(ctx context.Context, gtx layout.Context) layout.Di
 							s.errLogger.Printf("failed to refresh profile %s - %v", s.profiles.profiles[i].name, err)
 						}
 
-						s.profiles.selectedProfile = i
+						s.profiles.selectedIndex = i
 						s.currentUiMode = viewProfileUiMode
 						s.win.Invalidate()
 					}
 
 					// Row styling (highlight selected only when on profile frame)
 					row := func(gtx C) D {
-						if i == s.profiles.selectedProfile && s.currentUiMode != newProfileUiMode {
+						if i == s.profiles.selectedIndex && s.currentUiMode != newProfileUiMode {
 							paint.FillShape(gtx.Ops, SelectedBg, clip.Rect{Max: gtx.Constraints.Max}.Op())
 						}
 
@@ -137,9 +140,10 @@ func (s *State) renderButton(gtx layout.Context, label string, color color.NRGBA
 }
 
 func (s *State) renderLogs(gtx layout.Context) layout.Dimensions {
-	logsBody := material.Label(s.theme, 12, s.profiles.profiles[s.profiles.selectedProfile].wgu.Stderr())
+	logsBody := material.Label(s.theme, 12, s.profiles.selected().wgu.Stderr())
 	logsBody.Color = WhiteColor
 	logsBody.Alignment = text.Start
+	logsBody.State = s.logSelectable
 	return logsBody.Layout(gtx)
 }
 

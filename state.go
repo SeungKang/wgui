@@ -28,6 +28,7 @@ type State struct {
 	deleteButton     *widget.Clickable
 	saveButton       *widget.Clickable
 	cancelButton     *widget.Clickable
+	logSelectable    *widget.Selectable
 
 	list          *widget.List
 	theme         *material.Theme
@@ -53,10 +54,19 @@ const (
 )
 
 type profileState struct {
-	profileList     *widget.List
-	profiles        []profileConfig
-	profileClicks   []widget.Clickable
-	selectedProfile int
+	profileList   *widget.List
+	profiles      []profileConfig
+	profileClicks []widget.Clickable
+	selectedIndex int
+	events        chan profileEvent
+}
+
+func (o *profileState) selected() *profileConfig {
+	return &o.profiles[o.selectedIndex]
+}
+
+type profileEvent struct {
+	name string
 }
 
 type profileConfig struct {
@@ -95,6 +105,7 @@ func NewState(ctx context.Context, w *app.Window) *State {
 	}
 
 	s := &State{
+		logSelectable:    new(widget.Selectable),
 		configEditor:     new(widget.Editor),
 		connectButton:    new(widget.Clickable),
 		newProfileButton: new(widget.Clickable),
@@ -111,10 +122,11 @@ func NewState(ctx context.Context, w *app.Window) *State {
 		win:   w,
 		profiles: &profileState{
 			profileList: &widget.List{List: layout.List{Axis: layout.Vertical}},
+			events:      make(chan profileEvent),
 		},
 		profileNameEditor: new(widget.Editor),
 		wguDir:            filepath.Join(homeDir, ".wgu"),
-		wguExePath:        "wgu",
+		wguExePath:        "wgu", // TODO use absolute file path
 		errLogger:         log.Default(),
 		currentUiMode:     newProfileUiMode,
 	}
@@ -174,6 +186,10 @@ func (s *State) Run(ctx context.Context, w *app.Window) error {
 			}
 
 			acks <- struct{}{}
+		case e := <-s.profiles.events:
+			if e.name == s.profiles.selected().name {
+				s.win.Invalidate()
+			}
 		}
 	}
 }
@@ -200,7 +216,14 @@ func (s *State) loadProfiles(ctx context.Context) error {
 		config := profileConfig{
 			name:       profileName,
 			configPath: path,
-			wgu:        wguctl.NewFsm(ctx),
+			wgu: wguctl.NewFsm(ctx, wguctl.FsmConfig{
+				OnNewStderr: func(ctx context.Context) {
+					select {
+					case <-ctx.Done():
+					case s.profiles.events <- profileEvent{name: profileName}:
+					}
+				},
+			}),
 		}
 
 		err = config.refresh(ctx, s.wguExePath)
@@ -223,7 +246,7 @@ func (s *State) loadProfiles(ctx context.Context) error {
 	s.profiles.profileClicks = make([]widget.Clickable, len(s.profiles.profiles))
 
 	// Set initial selection
-	s.profiles.selectedProfile = 0
+	s.profiles.selectedIndex = 0
 
 	return nil
 }

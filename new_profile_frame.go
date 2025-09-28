@@ -16,33 +16,6 @@ import (
 func (s *State) renderNewProfileFrame(ctx context.Context, gtx layout.Context) layout.Dimensions {
 	paint.Fill(gtx.Ops, BgColor)
 
-	widgets := []layout.Widget{
-		func(gtx C) D { return s.renderSpacer(gtx, unit.Dp(16)) },
-		s.formField("Name", s.profileNameEditor, unit.Dp(80)),
-		s.formField("Config", s.configEditor, unit.Dp(200)),
-
-		// Save and Cancel buttons on the same row
-		func(gtx C) D {
-			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-				layout.Rigid(func(gtx C) D {
-					return s.renderButton(gtx, "Save", PurpleColor, s.saveButton, func() { s.saveProfile(ctx) })
-				}),
-
-				layout.Rigid(func(gtx C) D {
-					return layout.Inset{Left: unit.Dp(12)}.Layout(gtx, func(gtx C) D {
-						return s.renderButton(gtx, "Cancel", GreyColor, s.cancelButton, func() {
-							if len(s.profiles.profiles) != 0 {
-								s.currentUiMode = viewProfileUiMode
-							}
-						})
-					})
-				}),
-			)
-		},
-
-		func(gtx C) D { return s.renderErrorMessage(gtx, "this is an error message") },
-	}
-
 	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
 		// LEFT: Sidebar
 		layout.Rigid(func(gtx C) D {
@@ -51,9 +24,62 @@ func (s *State) renderNewProfileFrame(ctx context.Context, gtx layout.Context) l
 
 		// RIGHT: Main content
 		layout.Flexed(1, func(gtx C) D {
-			return material.List(s.theme, s.list).Layout(gtx, len(widgets), func(gtx C, i int) D {
-				return layout.UniformInset(unit.Dp(16)).Layout(gtx, widgets[i])
-			})
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+				// TOP: scrollable form
+				layout.Flexed(1, func(gtx C) D {
+					form := []layout.Widget{
+						func(gtx C) D { return s.renderSpacer(gtx, unit.Dp(16)) },
+						s.formField("Name", s.profileNameEditor, unit.Dp(80)),
+						s.formField("Config", s.configEditor, unit.Dp(200)),
+					}
+
+					// (optional) handle editor updates while laid out
+					s.handleNewProfileEditorUpdates(gtx)
+
+					return material.List(s.theme, s.list).Layout(gtx, len(form), func(gtx C, i int) D {
+						return layout.UniformInset(unit.Dp(16)).Layout(gtx, form[i])
+					})
+				}),
+
+				// BOTTOM: fixed action bar (Save/Cancel + error)
+				layout.Rigid(func(gtx C) D {
+					// Optional background for the bar
+					// paint.Fill(gtx.Ops, color.NRGBA{A:0xFF, R:24, G:24, B:28})
+
+					return layout.Inset{
+						Top: unit.Dp(8), Left: unit.Dp(16), Right: unit.Dp(16), Bottom: unit.Dp(16),
+					}.Layout(gtx, func(gtx C) D {
+						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+							// Buttons row
+							layout.Rigid(func(gtx C) D {
+								return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+									layout.Rigid(func(gtx C) D {
+										return s.renderButton(gtx, "Save", PurpleColor, s.saveButton, func() { s.saveProfile(ctx) })
+									}),
+									layout.Rigid(func(gtx C) D {
+										return layout.Inset{Left: unit.Dp(12)}.Layout(gtx, func(gtx C) D {
+											return s.renderButton(gtx, "Cancel", GreyColor, s.cancelButton, func() {
+												if len(s.profiles.profiles) != 0 {
+													s.currentUiMode = viewProfileUiMode
+												}
+											})
+										})
+									}),
+									// spacer to take remaining width (keeps buttons left-aligned)
+									layout.Flexed(1, func(gtx C) D { return layout.Spacer{}.Layout(gtx) }),
+								)
+							}),
+
+							// Error message under buttons
+							layout.Rigid(func(gtx C) D {
+								return layout.Inset{Top: unit.Dp(8)}.Layout(gtx, func(gtx C) D {
+									return s.renderErrorMessage(gtx, "this is an error message")
+								})
+							}),
+						)
+					})
+				}),
+			)
 		}),
 	)
 }
@@ -116,7 +142,7 @@ func (s *State) saveProfile(ctx context.Context) {
 	// Switch to the newly created profile (it will be in the sorted list, not at the end)
 	for i, profile := range s.profiles.profiles {
 		if profile.name == profileName {
-			s.profiles.selectedProfile = i
+			s.profiles.selectedIndex = i
 			s.currentUiMode = viewProfileUiMode
 			break
 		}
