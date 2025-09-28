@@ -21,13 +21,13 @@ import (
 )
 
 type State struct {
-	wgu              *wguctl.Fsm
 	connected        bool
 	connectButton    *widget.Clickable
 	newProfileButton *widget.Clickable
 	editButton       *widget.Clickable
 	deleteButton     *widget.Clickable
 	saveButton       *widget.Clickable
+	cancelButton     *widget.Clickable
 
 	list          *widget.List
 	theme         *material.Theme
@@ -64,6 +64,7 @@ type profileConfig struct {
 	configPath     string
 	pubkey         string
 	lastReadConfig string
+	wgu            *wguctl.Fsm
 }
 
 func (o *profileConfig) refresh(ctx context.Context, wguExePath string) error {
@@ -94,13 +95,13 @@ func NewState(ctx context.Context, w *app.Window) *State {
 	}
 
 	s := &State{
-		wgu:              wguctl.NewFsm(ctx),
 		configEditor:     new(widget.Editor),
 		connectButton:    new(widget.Clickable),
 		newProfileButton: new(widget.Clickable),
 		editButton:       new(widget.Clickable),
 		deleteButton:     new(widget.Clickable),
 		saveButton:       new(widget.Clickable),
+		cancelButton:     new(widget.Clickable),
 		list: &widget.List{
 			List: layout.List{
 				Axis: layout.Vertical,
@@ -109,9 +110,7 @@ func NewState(ctx context.Context, w *app.Window) *State {
 		theme: material.NewTheme(),
 		win:   w,
 		profiles: &profileState{
-			profileList:     &widget.List{List: layout.List{Axis: layout.Vertical}},
-			profileClicks:   []widget.Clickable{},
-			selectedProfile: 0,
+			profileList: &widget.List{List: layout.List{Axis: layout.Vertical}},
 		},
 		profileNameEditor: new(widget.Editor),
 		wguDir:            filepath.Join(homeDir, ".wgu"),
@@ -201,9 +200,13 @@ func (s *State) loadProfiles(ctx context.Context) error {
 		config := profileConfig{
 			name:       profileName,
 			configPath: path,
+			wgu:        wguctl.NewFsm(ctx),
 		}
 
-		config.refresh(ctx, s.wguExePath)
+		err = config.refresh(ctx, s.wguExePath)
+		if err != nil {
+			s.errLogger.Printf("failed to refresh profile - %v", err)
+		}
 
 		profileConfigs = append(profileConfigs, config)
 	}
@@ -214,8 +217,7 @@ func (s *State) loadProfiles(ctx context.Context) error {
 	})
 
 	// Initialize profiles with sorted profiles
-	s.profiles.profiles = make([]profileConfig, 0, len(profileConfigs))
-	s.profiles.profiles = append(s.profiles.profiles, profileConfigs...)
+	s.profiles.profiles = profileConfigs
 
 	// Initialize clickable widgets for all profiles
 	s.profiles.profileClicks = make([]widget.Clickable, len(s.profiles.profiles))

@@ -5,18 +5,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
+	"sync"
 	"time"
 )
 
 type Wgu struct {
+	once    sync.Once
 	process *exec.Cmd
-	stderr  chan string
 }
 
 type Config struct {
 	ExePath    string
 	ConfigPath string
+	OptStderr  chan<- string
 }
 
 func (o *Config) GetExePath() string {
@@ -28,16 +31,19 @@ func (o *Config) GetExePath() string {
 }
 
 func StartWgu(ctx context.Context, config Config) (*Wgu, error) {
-	wgu := exec.CommandContext(ctx, "wgu", "up", "-c", config.ConfigPath)
+	wgu := exec.CommandContext(ctx, config.ExePath, "up", "-c", config.ConfigPath)
 
 	stdout, err := wgu.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stdout pipe - %w", err)
 	}
 
-	stderr, err := wgu.StderrPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stderr pipe - %w", err)
+	var stderr io.Reader
+	if config.OptStderr != nil {
+		stderr, err = wgu.StderrPipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stderr pipe - %w", err)
+		}
 	}
 
 	err = wgu.Start()
@@ -52,20 +58,20 @@ func StartWgu(ctx context.Context, config Config) (*Wgu, error) {
 		exited <- wgu.Wait()
 	}()
 
-	stderrLines := make(chan string)
+	if stderr != nil {
+		go func() {
+			stderrScanner := bufio.NewScanner(stderr)
 
-	go func() {
-		stderrScanner := bufio.NewScanner(stderr)
-
-		for stderrScanner.Scan() {
-			select {
-			case <-ctx.Done():
-				return
-			case stderrLines <- stderrScanner.Text():
-				// keep going
+			for stderrScanner.Scan() {
+				select {
+				case <-ctx.Done():
+					return
+				case config.OptStderr <- stderrScanner.Text():
+					// keep going
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	isReady := make(chan error, 1)
 
@@ -103,10 +109,10 @@ func StartWgu(ctx context.Context, config Config) (*Wgu, error) {
 			return nil, fmt.Errorf("failed to get 'ready' result - %w", err)
 		}
 
-		return &Wgu{process: wgu, stderr: stderrLines}, nil
+		return &Wgu{process: wgu}, nil
 	}
 }
 
-func (w *Wgu) Stop() error {
-	return w.process.Process.Kill()
+func (o *Wgu) Stop() error {
+	return o.process.Process.Kill()
 }

@@ -119,7 +119,7 @@ func (s *State) renderTextEditor(gtx layout.Context, editor *widget.Editor, plac
 	)
 }
 
-func (s *State) renderButton(ctx context.Context, gtx layout.Context, label string, color color.NRGBA, button *widget.Clickable, onClick func()) layout.Dimensions {
+func (s *State) renderButton(gtx layout.Context, label string, color color.NRGBA, button *widget.Clickable, onClick func()) layout.Dimensions {
 	in := layout.UniformInset(unit.Dp(0))
 	return layout.Flex{Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(func(gtx C) D {
@@ -137,7 +137,7 @@ func (s *State) renderButton(ctx context.Context, gtx layout.Context, label stri
 }
 
 func (s *State) renderLogs(gtx layout.Context) layout.Dimensions {
-	logsBody := material.Body1(s.theme, "this is a message body")
+	logsBody := material.Label(s.theme, 12, s.profiles.profiles[s.profiles.selectedProfile].wgu.Stderr())
 	logsBody.Color = WhiteColor
 	logsBody.Alignment = text.Start
 	return logsBody.Layout(gtx)
@@ -150,8 +150,8 @@ func (s *State) renderErrorMessage(gtx layout.Context, message string) layout.Di
 }
 
 func (s *State) renderPubkey(gtx layout.Context, message string) layout.Dimensions {
-	pubkeyLabel := material.Label(s.theme, 16, message)
-	pubkeyLabel.Color = WhiteColor
+	pubkeyLabel := material.Label(s.theme, 12, message)
+	pubkeyLabel.Color = LightGreyColor
 	return pubkeyLabel.Layout(gtx)
 }
 

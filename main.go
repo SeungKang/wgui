@@ -32,9 +32,14 @@ func main() {
 		err := s.Run(ctx, w)
 		cancelFn()
 
-		select {
-		case <-time.After(2 * time.Second):
-		case <-s.wgu.Done():
+		timeoutctx, cancelTimeoutFn := context.WithTimeout(ctx, 2*time.Second)
+		defer cancelTimeoutFn()
+
+		for _, profile := range s.profiles.profiles {
+			select {
+			case <-timeoutctx.Done():
+			case <-profile.wgu.Done():
+			}
 		}
 
 		if err != nil {

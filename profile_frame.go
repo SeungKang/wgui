@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"image/color"
 	"os"
 	"wugui/internal/wguctl"
 
@@ -18,7 +19,7 @@ func (s *State) renderProfileFrame(ctx context.Context, gtx layout.Context) layo
 	selectedProfile := s.profiles.profiles[s.profiles.selectedProfile]
 
 	wguConfig := wguctl.Config{
-		ExePath:    "wgu",
+		ExePath:    s.wguExePath,
 		ConfigPath: selectedProfile.configPath,
 	}
 
@@ -27,25 +28,23 @@ func (s *State) renderProfileFrame(ctx context.Context, gtx layout.Context) layo
 			return s.renderProfileTitle(gtx)
 		},
 		func(gtx C) D {
-			return s.renderPubkey(gtx, selectedProfile.pubkey)
-		},
-		func(gtx C) D {
-			return s.renderSpacer(gtx, unit.Dp(16))
+			return s.renderPubkey(gtx, "pubkey: "+selectedProfile.pubkey)
 		},
 		func(gtx C) D {
 			return s.renderLogs(gtx)
 		},
+		// Connect, Edit, and Delete buttons on the same row
 		func(gtx C) D {
-			return s.renderSpacer(gtx, unit.Dp(16))
-		},
-		func(gtx C) D {
-			return s.renderConnectButton(ctx, gtx, wguConfig)
-		},
-		func(gtx C) D {
-			return s.renderEditButton(ctx, gtx)
-		},
-		func(gtx C) D {
-			return s.renderDeleteButton(ctx, gtx)
+			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+				layout.Rigid(func(gtx C) D {
+					return s.renderConnectButton(ctx, gtx, wguConfig)
+				}),
+				layout.Rigid(func(gtx C) D {
+					return layout.Inset{Left: unit.Dp(12)}.Layout(gtx, func(gtx C) D {
+						return s.renderEditButton(ctx, gtx)
+					})
+				}),
+			)
 		},
 		func(gtx C) D {
 			return s.renderErrorMessage(gtx, "this is an error message")
@@ -68,42 +67,50 @@ func (s *State) renderProfileFrame(ctx context.Context, gtx layout.Context) layo
 }
 
 func (s *State) renderProfileTitle(gtx layout.Context) layout.Dimensions {
-	l := material.H4(s.theme, s.profiles.profiles[s.profiles.selectedProfile].name)
-	l.Color = WhiteColor
+	l := material.H5(s.theme, s.profiles.profiles[s.profiles.selectedProfile].name)
+	l.Color = PurpleColor
 	l.State = new(widget.Selectable) // makes the text selectable
 	return l.Layout(gtx)
 }
 
 func (s *State) renderConnectButton(ctx context.Context, gtx layout.Context, config wguctl.Config) layout.Dimensions {
-	wguState, lastErr := s.wgu.State()
+	wguState, lastErr := s.profiles.profiles[s.profiles.selectedProfile].wgu.State()
 
 	var label string
+	var color color.NRGBA
 	switch wguState {
 	case wguctl.DisconnectingFsmState:
 		label = "Disconnecting..."
+		color = RedColor
 	case wguctl.DisconnectedFsmState:
 		label = "Connect"
+		color = GreenColor
 	case wguctl.ConnectingFsmState:
 		label = "Connecting..."
+		color = GreenColor
 	case wguctl.ConnectedFsmState:
 		label = "Disconnect"
+		color = RedColor
 	case wguctl.ErrorFsmState:
 		label = "Error"
+		color = RedColor
 		_ = lastErr
+	default:
+		// do nothing
 	}
 
-	return s.renderButton(ctx, gtx, label, PurpleColor, s.connectButton, func() {
+	return s.renderButton(gtx, label, color, s.connectButton, func() {
 		switch wguState {
 		case wguctl.ConnectedFsmState, wguctl.ConnectingFsmState:
-			_ = s.wgu.Disconnect(ctx)
+			_ = s.profiles.profiles[s.profiles.selectedProfile].wgu.Disconnect(ctx)
 		default:
-			_ = s.wgu.Connect(ctx, config)
+			_ = s.profiles.profiles[s.profiles.selectedProfile].wgu.Connect(ctx, config)
 		}
 	})
 }
 
 func (s *State) renderEditButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
-	return s.renderButton(ctx, gtx, "edit", GreyColor, s.editButton, func() {
+	return s.renderButton(gtx, "Edit", GreyColor, s.editButton, func() {
 		s.currentUiMode = editProfileUiMode
 
 		s.profileNameEditor.SetText(s.profiles.profiles[s.profiles.selectedProfile].name)
@@ -112,7 +119,7 @@ func (s *State) renderEditButton(ctx context.Context, gtx layout.Context) layout
 }
 
 func (s *State) renderDeleteButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
-	return s.renderButton(ctx, gtx, "delete", RedColor, s.deleteButton, func() {
+	return s.renderButton(gtx, "Delete", RedColor, s.deleteButton, func() {
 		configPath := s.profiles.profiles[s.profiles.selectedProfile].configPath
 		err := os.Remove(configPath)
 		if err != nil {
@@ -120,6 +127,9 @@ func (s *State) renderDeleteButton(ctx context.Context, gtx layout.Context) layo
 		}
 
 		// Refresh the profiles list
-		s.RefreshProfiles(ctx)
+		err = s.RefreshProfiles(ctx)
+		if err != nil {
+			s.errLogger.Printf("failed to refresh profile - %v", err)
+		}
 	})
 }

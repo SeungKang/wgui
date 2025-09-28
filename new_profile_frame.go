@@ -21,8 +21,23 @@ func (s *State) renderNewProfileFrame(ctx context.Context, gtx layout.Context) l
 		s.formField("Name", s.profileNameEditor, unit.Dp(80)),
 		s.formField("Config", s.configEditor, unit.Dp(200)),
 
+		// Save and Cancel buttons on the same row
 		func(gtx C) D {
-			return s.renderButton(ctx, gtx, "Save", PurpleColor, s.saveButton, func() { s.saveNewProfile(ctx) })
+			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+				layout.Rigid(func(gtx C) D {
+					return s.renderButton(gtx, "Save", PurpleColor, s.saveButton, func() { s.saveProfile(ctx) })
+				}),
+
+				layout.Rigid(func(gtx C) D {
+					return layout.Inset{Left: unit.Dp(12)}.Layout(gtx, func(gtx C) D {
+						return s.renderButton(gtx, "Cancel", GreyColor, s.cancelButton, func() {
+							if len(s.profiles.profiles) != 0 {
+								s.currentUiMode = viewProfileUiMode
+							}
+						})
+					})
+				}),
+			)
 		},
 
 		func(gtx C) D { return s.renderErrorMessage(gtx, "this is an error message") },
@@ -62,32 +77,25 @@ func (s *State) formField(label string, ed *widget.Editor, h unit.Dp) layout.Wid
 	}
 }
 
-func (s *State) saveNewProfile(ctx context.Context) {
+func (s *State) saveProfile(ctx context.Context) {
 	profileName := s.profileNameEditor.Text()
 	configContent := s.configEditor.Text()
+
+	// TODO if editProfileUiMode, and name is changed, change the config filename
 
 	if profileName == "" || configContent == "" {
 		s.errLogger.Printf("Profile name or config content is empty")
 		return
 	}
 
-	// Get user home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		s.errLogger.Printf("Error getting home directory: %v", err)
-		return
-	}
-
-	wguDir := filepath.Join(homeDir, ".wgu")
-
 	// Create .wgu directory if it doesn't exist
-	if err := os.MkdirAll(wguDir, 0755); err != nil {
+	if err := os.MkdirAll(s.wguDir, 0755); err != nil {
 		s.errLogger.Printf("Error creating .wgu directory: %v", err)
 		return
 	}
 
 	// Create the config file path
-	configPath := filepath.Join(wguDir, profileName+".conf")
+	configPath := filepath.Join(s.wguDir, profileName+".conf")
 
 	// Write the config to file
 	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
@@ -100,7 +108,10 @@ func (s *State) saveNewProfile(ctx context.Context) {
 	s.configEditor.SetText("")
 
 	// Refresh the profiles list
-	s.RefreshProfiles(ctx)
+	err := s.RefreshProfiles(ctx)
+	if err != nil {
+		s.errLogger.Printf("failed to refresh profile - %v", err)
+	}
 
 	// Switch to the newly created profile (it will be in the sorted list, not at the end)
 	for i, profile := range s.profiles.profiles {
@@ -114,31 +125,17 @@ func (s *State) saveNewProfile(ctx context.Context) {
 func (s *State) handleNewProfileEditorUpdates(gtx layout.Context) {
 	// Profile name editor updates
 	for {
-		updateEvent, ok := s.profileNameEditor.Update(gtx)
+		_, ok := s.profileNameEditor.Update(gtx)
 		if !ok {
 			break
-		}
-
-		if _, ok := updateEvent.(widget.ChangeEvent); ok {
-			var err error
-			if err != nil {
-				s.errLogger.Printf("failed to render profile name editor - %v", err)
-			}
 		}
 	}
 
 	// Config editor updates
 	for {
-		updateEvent, ok := s.configEditor.Update(gtx)
+		_, ok := s.configEditor.Update(gtx)
 		if !ok {
 			break
-		}
-
-		if _, ok := updateEvent.(widget.ChangeEvent); ok {
-			var err error
-			if err != nil {
-				s.errLogger.Printf("failed to render config editor - %v", err)
-			}
 		}
 	}
 }

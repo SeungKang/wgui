@@ -18,23 +18,29 @@ const (
 
 func NewFsm(ctx context.Context) *Fsm {
 	fsm := &Fsm{
-		events: make(chan interface{}, 10),
-		state:  DisconnectedFsmState,
-		done:   make(chan struct{}),
+		events:   make(chan interface{}, 10),
+		state:    DisconnectedFsmState,
+		stderrCh: make(chan string),
+		done:     make(chan struct{}),
 	}
 
 	go fsm.loop(ctx)
+
+	go fsm.handleStderr(ctx)
 
 	return fsm
 }
 
 type Fsm struct {
-	wgu       *Wgu
-	events    chan interface{}
-	rwMutex   sync.RWMutex
-	state     FsmState
-	lastError error
-	done      chan struct{}
+	wgu        *Wgu
+	events     chan interface{}
+	rwMutex    sync.RWMutex
+	state      FsmState
+	lastError  error
+	stderrRWMu sync.RWMutex
+	stderr     string
+	stderrCh   chan string
+	done       chan struct{}
 }
 
 func (o *Fsm) Connect(ctx context.Context, config Config) error {
@@ -127,6 +133,8 @@ func (o *Fsm) connect(ctx context.Context, config Config) error {
 		o.wgu = nil
 	}
 
+	config.OptStderr = o.stderrCh
+
 	wgu, err := StartWgu(ctx, config)
 	if err != nil {
 		return err
@@ -147,4 +155,26 @@ func (o *Fsm) State() (FsmState, error) {
 	defer o.rwMutex.RUnlock()
 
 	return o.state, o.lastError
+}
+
+func (o *Fsm) Stderr() string {
+	o.stderrRWMu.RLock()
+	defer o.stderrRWMu.RUnlock()
+
+	return o.stderr
+}
+
+func (o *Fsm) handleStderr(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case line := <-o.stderrCh:
+			o.stderrRWMu.Lock()
+
+			o.stderr += line + "\n"
+
+			o.stderrRWMu.Unlock()
+		}
+	}
 }
