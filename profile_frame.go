@@ -4,6 +4,7 @@ import (
 	"context"
 	"image/color"
 	"os"
+	"strings"
 	"wugui/internal/wguctl"
 
 	"gioui.org/layout"
@@ -25,54 +26,70 @@ func (s *State) renderProfileFrame(ctx context.Context, gtx layout.Context) layo
 		// RIGHT: Main content
 		layout.Flexed(1, func(gtx C) D {
 			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				// TOP: scrollable content
+				// TOP: fixed header (title + pubkey)
+				layout.Rigid(func(gtx C) D {
+					return layout.UniformInset(unit.Dp(16)).Layout(gtx, func(gtx C) D {
+						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+							layout.Rigid(func(gtx C) D { return s.renderProfileTitle(gtx) }),
+							layout.Rigid(func(gtx C) D {
+								return s.renderPubkey(gtx, "pubkey: "+s.profiles.selected().pubkey)
+							}),
+						)
+					})
+				}),
+
+				// MIDDLE: scrollable logs only (List-based)
 				layout.Flexed(1, func(gtx C) D {
-					items := []layout.Widget{
-						func(gtx C) D {
-							return s.renderProfileTitle(gtx)
-						},
-						func(gtx C) D {
-							return s.renderPubkey(gtx, "pubkey: "+s.profiles.selected().pubkey)
-						},
-						func(gtx C) D {
-							return s.renderLogs(gtx)
-						},
+					logs := s.profiles.selected().wgu.Stderr()
+					lines := strings.Split(strings.ReplaceAll(logs, "\r\n", "\n"), "\n")
+
+					// trim trailing empty line
+					if len(lines) > 0 && lines[len(lines)-1] == "" {
+						lines = lines[:len(lines)-1]
 					}
 
-					// your existing list for scrolling
-					return material.List(s.theme, s.list).Layout(gtx, len(items), func(gtx C, i int) D {
-						return layout.UniformInset(unit.Dp(16)).Layout(gtx, items[i])
+					// 🔹 Grow/shrink logSelectables here
+					for len(s.logSelectables) < len(lines) {
+						s.logSelectables = append(s.logSelectables, widget.Selectable{})
+					}
+					if len(s.logSelectables) > len(lines) {
+						s.logSelectables = s.logSelectables[:len(lines)]
+					}
+
+					return material.List(s.theme, s.logsList).Layout(gtx, len(lines), func(gtx C, i int) D {
+						row := material.Body1(s.theme, lines[i])
+						row.State = &s.logSelectables[i]
+						row.Color = WhiteColor
+						row.TextSize = unit.Sp(12)
+						row.Font.Typeface = "monospace"
+
+						return layout.Inset{
+							Top: unit.Dp(2), Bottom: unit.Dp(0),
+							Left: unit.Dp(16), Right: unit.Dp(8),
+						}.Layout(gtx, row.Layout)
 					})
 				}),
 
 				// BOTTOM: fixed bar (buttons + error)
 				layout.Rigid(func(gtx C) D {
-					// optional: add its own background
-					// paint.Fill(gtx.Ops, color.NRGBA{A:0xFF, R:20, G:20, B:24})
-
 					return layout.Inset{
-						Top: unit.Dp(8), Left: unit.Dp(16), Right: unit.Dp(16), Bottom: unit.Dp(16),
+						Top: unit.Dp(16), Left: unit.Dp(16), Right: unit.Dp(16), Bottom: unit.Dp(16),
 					}.Layout(gtx, func(gtx C) D {
 						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-							// Row of buttons
+							// Buttons row
 							layout.Rigid(func(gtx C) D {
 								wguConfig := wguctl.Config{ExePath: s.wguExePath, ConfigPath: s.profiles.selected().configPath}
-
 								return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-									layout.Rigid(func(gtx C) D {
-										return s.renderConnectButton(ctx, gtx, wguConfig)
-									}),
+									layout.Rigid(func(gtx C) D { return s.renderConnectButton(ctx, gtx, wguConfig) }),
 									layout.Rigid(func(gtx C) D {
 										return layout.Inset{Left: unit.Dp(12)}.Layout(gtx, func(gtx C) D {
 											return s.renderEditButton(ctx, gtx)
 										})
 									}),
-									// spacer to take remaining width (keeps buttons left-aligned)
 									layout.Flexed(1, func(gtx C) D { return layout.Spacer{}.Layout(gtx) }),
 								)
 							}),
-
-							// Error message under the buttons
+							// Error message
 							layout.Rigid(func(gtx C) D {
 								return layout.Inset{Top: unit.Dp(8)}.Layout(gtx, func(gtx C) D {
 									return s.renderErrorMessage(gtx, "this is an error message")

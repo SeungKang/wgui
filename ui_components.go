@@ -143,7 +143,7 @@ func (s *State) renderLogs(gtx layout.Context) layout.Dimensions {
 	logsBody := material.Label(s.theme, 12, s.profiles.selected().wgu.Stderr())
 	logsBody.Color = WhiteColor
 	logsBody.Alignment = text.Start
-	logsBody.State = s.logSelectable
+
 	return logsBody.Layout(gtx)
 }
 
@@ -156,7 +156,11 @@ func (s *State) renderErrorMessage(gtx layout.Context, message string) layout.Di
 func (s *State) renderPubkey(gtx layout.Context, message string) layout.Dimensions {
 	pubkeyLabel := material.Label(s.theme, 12, message)
 	pubkeyLabel.Color = LightGreyColor
-	return pubkeyLabel.Layout(gtx)
+	pubkeyLabel.State = &s.pubkeySelectable
+
+	return layout.Inset{
+		Top: unit.Dp(2),
+	}.Layout(gtx, pubkeyLabel.Layout)
 }
 
 func (s *State) renderSpacer(gtx layout.Context, height unit.Dp) layout.Dimensions {

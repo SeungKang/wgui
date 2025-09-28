@@ -28,7 +28,10 @@ type State struct {
 	deleteButton     *widget.Clickable
 	saveButton       *widget.Clickable
 	cancelButton     *widget.Clickable
-	logSelectable    *widget.Selectable
+
+	pubkeySelectable widget.Selectable
+	logSelectables   []widget.Selectable
+	logsList         *widget.List
 
 	list          *widget.List
 	theme         *material.Theme
@@ -105,7 +108,12 @@ func NewState(ctx context.Context, w *app.Window) *State {
 	}
 
 	s := &State{
-		logSelectable:    new(widget.Selectable),
+		logsList: &widget.List{
+			List: layout.List{
+				Axis:        layout.Vertical,
+				ScrollToEnd: true,
+			},
+		},
 		configEditor:     new(widget.Editor),
 		connectButton:    new(widget.Clickable),
 		newProfileButton: new(widget.Clickable),
