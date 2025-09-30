@@ -116,6 +116,8 @@ func (s *State) renderTextEditor(gtx layout.Context, editor *widget.Editor, plac
 			return in.Layout(gtx, func(gtx C) D {
 				ed := material.Editor(s.theme, editor, placeholder)
 				ed.Color = WhiteColor
+				ed.TextSize = unit.Sp(14)
+				ed.Font.Typeface = "monospace"
 				return ed.Layout(gtx)
 			})
 		}),

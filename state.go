@@ -30,7 +30,7 @@ type State struct {
 	cancelButton     *widget.Clickable
 
 	pubkeySelectable widget.Selectable
-	logSelectables   []widget.Selectable
+	logSelectables   widget.Selectable
 	logsList         *widget.List
 
 	list          *widget.List
@@ -107,6 +107,11 @@ func NewState(ctx context.Context, w *app.Window) *State {
 		panic(err)
 	}
 
+	wguPath, err := wguExePath()
+	if err != nil {
+		panic(err)
+	}
+
 	s := &State{
 		logsList: &widget.List{
 			List: layout.List{
@@ -134,7 +139,7 @@ func NewState(ctx context.Context, w *app.Window) *State {
 		},
 		profileNameEditor: new(widget.Editor),
 		wguDir:            filepath.Join(homeDir, ".wgu"),
-		wguExePath:        "wgu", // TODO use absolute file path
+		wguExePath:        wguPath,
 		errLogger:         log.Default(),
 		currentUiMode:     newProfileUiMode,
 	}

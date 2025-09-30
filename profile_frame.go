@@ -4,7 +4,6 @@ import (
 	"context"
 	"image/color"
 	"os"
-	"strings"
 	"wugui/internal/wguctl"
 
 	"gioui.org/layout"
@@ -41,24 +40,10 @@ func (s *State) renderProfileFrame(ctx context.Context, gtx layout.Context) layo
 				// MIDDLE: scrollable logs only (List-based)
 				layout.Flexed(1, func(gtx C) D {
 					logs := s.profiles.selected().wgu.Stderr()
-					lines := strings.Split(strings.ReplaceAll(logs, "\r\n", "\n"), "\n")
 
-					// trim trailing empty line
-					if len(lines) > 0 && lines[len(lines)-1] == "" {
-						lines = lines[:len(lines)-1]
-					}
-
-					// 🔹 Grow/shrink logSelectables here
-					for len(s.logSelectables) < len(lines) {
-						s.logSelectables = append(s.logSelectables, widget.Selectable{})
-					}
-					if len(s.logSelectables) > len(lines) {
-						s.logSelectables = s.logSelectables[:len(lines)]
-					}
-
-					return material.List(s.theme, s.logsList).Layout(gtx, len(lines), func(gtx C, i int) D {
-						row := material.Body1(s.theme, lines[i])
-						row.State = &s.logSelectables[i]
+					return material.List(s.theme, s.logsList).Layout(gtx, 1, func(gtx C, i int) D {
+						row := material.Body1(s.theme, logs)
+						row.State = &s.logSelectables
 						row.Color = WhiteColor
 						row.TextSize = unit.Sp(12)
 						row.Font.Typeface = "monospace"
