@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	"wugui/internal/wguctl"
 
 	"gioui.org/app"
@@ -30,16 +31,18 @@ type State struct {
 	cancelButton     *widget.Clickable
 
 	pubkeySelectable widget.Selectable
+	iconButton       *widget.Clickable
 	logSelectables   widget.Selectable
 	logsList         *widget.List
 
-	list          *widget.List
-	theme         *material.Theme
-	win           *app.Window
-	wguDir        string
-	wguExePath    string
-	errLogger     *log.Logger
-	currentUiMode uiMode
+	list              *widget.List
+	theme             *material.Theme
+	win               *app.Window
+	wguDir            string
+	wguExePath        string
+	errLogger         *log.Logger
+	currentUiMode     uiMode
+	copiedMessageTime time.Time
 
 	// new config
 	profileNameEditor *widget.Editor
@@ -78,9 +81,20 @@ type profileConfig struct {
 	pubkey         string
 	lastReadConfig string
 	wgu            *wguctl.Fsm
+	lastErrMsg     string
 }
 
-func (o *profileConfig) refresh(ctx context.Context, wguExePath string) error {
+func (o *profileConfig) refresh(ctx context.Context, wguExePath string, logger *log.Logger) {
+	err := o.refreshWithErr(ctx, wguExePath)
+	if err != nil {
+		o.lastErrMsg = err.Error()
+		logger.Printf("failed to refresh profile - %v", err)
+	} else {
+		o.lastErrMsg = ""
+	}
+}
+
+func (o *profileConfig) refreshWithErr(ctx context.Context, wguExePath string) error {
 	config, err := os.ReadFile(o.configPath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s - %v", o.configPath, err)
@@ -142,6 +156,7 @@ func NewState(ctx context.Context, w *app.Window) *State {
 		wguExePath:        wguPath,
 		errLogger:         log.Default(),
 		currentUiMode:     newProfileUiMode,
+		iconButton:        new(widget.Clickable),
 	}
 
 	s.theme.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
@@ -239,10 +254,7 @@ func (s *State) loadProfiles(ctx context.Context) error {
 			}),
 		}
 
-		err = config.refresh(ctx, s.wguExePath)
-		if err != nil {
-			s.errLogger.Printf("failed to refresh profile - %v", err)
-		}
+		config.refresh(ctx, s.wguExePath, s.errLogger)
 
 		profileConfigs = append(profileConfigs, config)
 	}

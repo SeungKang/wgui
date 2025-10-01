@@ -17,8 +17,9 @@ func GetPublicKeyFromConfig(ctx context.Context, config Config) (string, error) 
 
 	output, err := wguCmd.Output()
 	if err != nil {
+
 		return "", fmt.Errorf("failed to execute '%s' - %w - stderr: '%s'",
-			wguCmd.String(), err, stderr.String())
+			wguCmd.String(), err, strings.TrimSpace(stderr.String()))
 	}
 
 	// Trim whitespace from output

@@ -56,10 +56,7 @@ func (s *State) renderSidebar(ctx context.Context, gtx layout.Context) layout.Di
 			layout.Flexed(1, func(gtx C) D {
 				return material.List(s.theme, s.profiles.profileList).Layout(gtx, len(s.profiles.profiles), func(gtx C, i int) D {
 					for s.profiles.profileClicks[i].Clicked(gtx) {
-						err := s.profiles.profiles[i].refresh(ctx, s.wguExePath)
-						if err != nil {
-							s.errLogger.Printf("failed to refresh profile %s - %v", s.profiles.profiles[i].name, err)
-						}
+						s.profiles.profiles[i].refresh(ctx, s.wguExePath, s.errLogger)
 
 						s.profiles.selectedIndex = i
 						s.currentUiMode = viewProfileUiMode
