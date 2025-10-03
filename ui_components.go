@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"golang.org/x/exp/shiny/materialdesign/icons"
+	"image"
 	"image/color"
 
 	"gioui.org/layout"
@@ -30,29 +32,15 @@ func (s *State) renderSidebar(ctx context.Context, gtx layout.Context) layout.Di
 	return in.Layout(gtx, func(gtx C) D {
 		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 			layout.Rigid(func(gtx C) D {
-				// Set fixed width for the button
-				btnWidth := gtx.Dp(40)
-				gtx.Constraints.Min.X, gtx.Constraints.Max.X = btnWidth, btnWidth
-
-				btn := material.Button(s.theme, s.newProfileButton, "+")
-				btn.Background = PurpleColor
-
-				for s.newProfileButton.Clicked(gtx) {
-					s.profileNameEditor.SetText("")
-					s.configEditor.SetText("")
-					s.currentUiMode = newProfileUiMode
-					s.win.Invalidate()
-				}
-
-				return btn.Layout(gtx)
+				return s.renderSidebarButtons(ctx, gtx)
 			}),
 
-			// Spacing between button and list
+			// Spacing between buttons and list
 			layout.Rigid(func(gtx C) D {
 				return layout.Spacer{Height: unit.Dp(8)}.Layout(gtx)
 			}),
 
-			// Profile list below button
+			// Profile list below buttons
 			layout.Flexed(1, func(gtx C) D {
 				return material.List(s.theme, s.profiles.profileList).Layout(gtx, len(s.profiles.profiles), func(gtx C, i int) D {
 					for s.profiles.profileClicks[i].Clicked(gtx) {
@@ -81,6 +69,66 @@ func (s *State) renderSidebar(ctx context.Context, gtx layout.Context) layout.Di
 				})
 			}),
 		)
+	})
+}
+
+// renderSidebarButtons shows the new profile and refresh buttons
+func (s *State) renderSidebarButtons(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
+		// New profile button (left)
+		layout.Rigid(func(gtx C) D {
+			btnWidth := gtx.Dp(40)
+			gtx.Constraints.Min.X, gtx.Constraints.Max.X = btnWidth, btnWidth
+
+			btn := material.Button(s.theme, s.newProfileButton, "+")
+			btn.Background = PurpleColor
+
+			for s.newProfileButton.Clicked(gtx) {
+				s.profileNameEditor.SetText("")
+				s.configEditor.SetText("")
+				s.currentUiMode = newProfileUiMode
+				s.win.Invalidate()
+			}
+
+			return btn.Layout(gtx)
+		}),
+
+		// Spacer to push refresh button to the right
+		layout.Flexed(1, func(gtx C) D {
+			return layout.Spacer{}.Layout(gtx)
+		}),
+
+		// Refresh button (right)
+		layout.Rigid(func(gtx C) D {
+			return s.renderSidebarRefreshButton(ctx, gtx)
+		}),
+	)
+}
+
+// renderSidebarRefreshButton shows the refresh icon button
+func (s *State) renderSidebarRefreshButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	icon, err := widget.NewIcon(icons.NavigationRefresh)
+	if err != nil {
+		s.errLogger.Printf("failed to create refresh icon: %v", err)
+		return layout.Dimensions{}
+	}
+
+	if s.refreshIconButton.Clicked(gtx) {
+		_ = s.RefreshProfiles(ctx)
+	}
+
+	// Match the size of the "+" button
+	btnSize := gtx.Dp(40)
+	gtx.Constraints.Min.X, gtx.Constraints.Max.X = btnSize, btnSize
+	gtx.Constraints.Min.Y, gtx.Constraints.Max.Y = btnSize, btnSize
+
+	return s.refreshIconButton.Layout(gtx, func(gtx C) D {
+
+		// Center the icon
+		return layout.Center.Layout(gtx, func(gtx C) D {
+			gtx.Constraints.Min = image.Point{}
+			return icon.Layout(gtx, GreenColor)
+		})
 	})
 }
 
@@ -114,7 +162,6 @@ func (s *State) renderTextEditor(gtx layout.Context, editor *widget.Editor, plac
 				ed := material.Editor(s.theme, editor, placeholder)
 				ed.Color = WhiteColor
 				ed.TextSize = unit.Sp(14)
-				ed.Font.Typeface = "monospace"
 				return ed.Layout(gtx)
 			})
 		}),
@@ -155,7 +202,7 @@ func (s *State) renderErrorMessage(gtx layout.Context, message string) layout.Di
 func (s *State) renderPubkey(gtx layout.Context, message string) layout.Dimensions {
 	pubkeyLabel := material.Label(s.theme, 12, message)
 	pubkeyLabel.Color = LightGreyColor
-	pubkeyLabel.State = &s.pubkeySelectable
+	pubkeyLabel.State = s.pubkeySelectable
 
 	return layout.Inset{
 		Top: unit.Dp(2),

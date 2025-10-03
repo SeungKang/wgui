@@ -22,33 +22,36 @@ import (
 )
 
 type State struct {
-	connected        bool
-	connectButton    *widget.Clickable
-	newProfileButton *widget.Clickable
-	editButton       *widget.Clickable
-	deleteButton     *widget.Clickable
-	saveButton       *widget.Clickable
-	cancelButton     *widget.Clickable
+	// sidebar
+	newProfileButton    *widget.Clickable
+	refreshIconButton   *widget.Clickable
+	sidebarProfilesList *widget.List
 
-	pubkeySelectable widget.Selectable
-	iconButton       *widget.Clickable
-	logSelectables   widget.Selectable
-	logsList         *widget.List
-
-	list              *widget.List
-	theme             *material.Theme
-	win               *app.Window
-	wguDir            string
-	wguExePath        string
-	errLogger         *log.Logger
-	currentUiMode     uiMode
+	// profile_frame
+	pubkeySelectable  *widget.Selectable
+	copyIconButton    *widget.Clickable
 	copiedMessageTime time.Time
+	connectButton     *widget.Clickable
+	editButton        *widget.Clickable
+	logsList          *widget.List
+	logSelectables    *widget.Selectable
 
-	// new config
+	// new_profile_frame
 	profileNameEditor *widget.Editor
 	configEditor      *widget.Editor
+	saveButton        *widget.Clickable
+	cancelButton      *widget.Clickable
+	deleteButton      *widget.Clickable
 
-	profiles *profileState
+	// window
+	theme *material.Theme
+	win   *app.Window
+
+	wguDir        string
+	wguExePath    string
+	errLogger     *log.Logger
+	currentUiMode uiMode
+	profiles      *profileState
 }
 
 type uiMode int
@@ -127,36 +130,38 @@ func NewState(ctx context.Context, w *app.Window) *State {
 	}
 
 	s := &State{
+		newProfileButton:  new(widget.Clickable),
+		refreshIconButton: new(widget.Clickable),
+		sidebarProfilesList: &widget.List{
+			List: layout.List{
+				Axis: layout.Vertical,
+			},
+		},
+		copyIconButton: new(widget.Clickable),
+		connectButton:  new(widget.Clickable),
+		editButton:     new(widget.Clickable),
 		logsList: &widget.List{
 			List: layout.List{
 				Axis:        layout.Vertical,
 				ScrollToEnd: true,
 			},
 		},
-		configEditor:     new(widget.Editor),
-		connectButton:    new(widget.Clickable),
-		newProfileButton: new(widget.Clickable),
-		editButton:       new(widget.Clickable),
-		deleteButton:     new(widget.Clickable),
-		saveButton:       new(widget.Clickable),
-		cancelButton:     new(widget.Clickable),
-		list: &widget.List{
-			List: layout.List{
-				Axis: layout.Vertical,
-			},
-		},
-		theme: material.NewTheme(),
-		win:   w,
+		logSelectables:    new(widget.Selectable),
+		profileNameEditor: new(widget.Editor),
+		configEditor:      new(widget.Editor),
+		saveButton:        new(widget.Clickable),
+		cancelButton:      new(widget.Clickable),
+		deleteButton:      new(widget.Clickable),
+		theme:             material.NewTheme(),
+		win:               w,
 		profiles: &profileState{
 			profileList: &widget.List{List: layout.List{Axis: layout.Vertical}},
 			events:      make(chan profileEvent),
 		},
-		profileNameEditor: new(widget.Editor),
-		wguDir:            filepath.Join(homeDir, ".wgu"),
-		wguExePath:        wguPath,
-		errLogger:         log.Default(),
-		currentUiMode:     newProfileUiMode,
-		iconButton:        new(widget.Clickable),
+		wguDir:        filepath.Join(homeDir, ".wgu"),
+		wguExePath:    wguPath,
+		errLogger:     log.Default(),
+		currentUiMode: newProfileUiMode,
 	}
 
 	s.theme.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
@@ -270,9 +275,6 @@ func (s *State) loadProfiles(ctx context.Context) error {
 	// Initialize clickable widgets for all profiles
 	s.profiles.profileClicks = make([]widget.Clickable, len(s.profiles.profiles))
 
-	// Set initial selection
-	s.profiles.selectedIndex = 0
-
 	return nil
 }
 
@@ -281,6 +283,7 @@ func (s *State) RefreshProfiles(ctx context.Context) error {
 	if err != nil {
 		s.errLogger.Printf("Error refreshing profiles: %v", err)
 	}
+
 	if s.win != nil {
 		s.win.Invalidate()
 	}

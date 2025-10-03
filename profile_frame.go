@@ -27,13 +27,13 @@ func (s *State) renderProfileFrame(ctx context.Context, gtx layout.Context) layo
 			return s.renderSidebar(ctx, gtx)
 		}),
 		layout.Flexed(1, func(gtx C) D {
-			return s.renderMainContent(ctx, gtx)
+			return s.renderProfileContent(ctx, gtx)
 		}),
 	)
 }
 
-// renderMainContent contains the header, logs, and action bar
-func (s *State) renderMainContent(ctx context.Context, gtx layout.Context) layout.Dimensions {
+// renderProfileContent contains the header, logs, and action bar
+func (s *State) renderProfileContent(ctx context.Context, gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 		layout.Rigid(func(gtx C) D {
 			return s.renderProfileHeader(gtx)
@@ -80,7 +80,7 @@ func (s *State) renderCopyButton(gtx layout.Context) layout.Dimensions {
 		return layout.Dimensions{}
 	}
 
-	if s.iconButton.Clicked(gtx) {
+	if s.copyIconButton.Clicked(gtx) {
 		gtx.Execute(clipboard.WriteCmd{Data: io.NopCloser(strings.NewReader(s.profiles.selected().pubkey))})
 		s.showCopiedMessage()
 	}
@@ -88,7 +88,7 @@ func (s *State) renderCopyButton(gtx layout.Context) layout.Dimensions {
 	return layout.Inset{Left: unit.Dp(8)}.Layout(gtx, func(gtx C) D {
 		return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
 			layout.Rigid(func(gtx C) D {
-				btn := material.IconButton(s.theme, s.iconButton, icon, "Copy public key")
+				btn := material.IconButton(s.theme, s.copyIconButton, icon, "Copy public key")
 				btn.Size = unit.Dp(16)
 				btn.Inset = layout.UniformInset(unit.Dp(2))
 				btn.Description = "copy public key to clipboard"
@@ -128,7 +128,7 @@ func (s *State) renderLogsSection(gtx layout.Context) layout.Dimensions {
 
 	return material.List(s.theme, s.logsList).Layout(gtx, 1, func(gtx C, i int) D {
 		row := material.Body1(s.theme, logs)
-		row.State = &s.logSelectables
+		row.State = s.logSelectables
 		row.Color = WhiteColor
 		row.TextSize = unit.Sp(12)
 		row.Font.Typeface = "monospace"
@@ -170,7 +170,7 @@ func (s *State) renderActionButtons(ctx context.Context, gtx layout.Context) lay
 		}),
 		layout.Rigid(func(gtx C) D {
 			return layout.Inset{Left: unit.Dp(12)}.Layout(gtx, func(gtx C) D {
-				return s.renderEditButton(ctx, gtx)
+				return s.renderEditButton(gtx)
 			})
 		}),
 		layout.Flexed(1, func(gtx C) D {
@@ -244,7 +244,7 @@ func (s *State) createConnectButtonHandler(ctx context.Context, config wguctl.Co
 }
 
 // renderEditButton shows the edit profile button
-func (s *State) renderEditButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
+func (s *State) renderEditButton(gtx layout.Context) layout.Dimensions {
 	onClick := func() {
 		s.switchToEditMode()
 	}
@@ -256,14 +256,6 @@ func (s *State) switchToEditMode() {
 	s.currentUiMode = editProfileUiMode
 	s.profileNameEditor.SetText(s.profiles.selected().name)
 	s.configEditor.SetText(s.profiles.selected().lastReadConfig)
-}
-
-// renderDeleteButton shows the delete profile button
-func (s *State) renderDeleteButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
-	onClick := func() {
-		s.deleteProfile(ctx)
-	}
-	return s.renderButton(gtx, "Delete", RedColor, s.deleteButton, onClick)
 }
 
 // deleteProfile removes the profile config and refreshes the list

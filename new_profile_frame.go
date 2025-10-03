@@ -13,89 +13,140 @@ import (
 	"gioui.org/widget/material"
 )
 
+// renderNewProfileFrame is the main layout for creating/editing a profile
 func (s *State) renderNewProfileFrame(ctx context.Context, gtx layout.Context) layout.Dimensions {
 	paint.Fill(gtx.Ops, BgColor)
 
 	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-		// LEFT: Sidebar
 		layout.Rigid(func(gtx C) D {
 			return s.renderSidebar(ctx, gtx)
 		}),
-
-		// RIGHT: Main content
 		layout.Flexed(1, func(gtx C) D {
-			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-				// TOP: scrollable form
-				layout.Flexed(1, func(gtx C) D {
-					form := []layout.Widget{
-						func(gtx C) D { return s.renderSpacer(gtx, unit.Dp(16)) },
-						s.formField("Name", s.profileNameEditor, unit.Dp(80)),
-						s.formField("Config", s.configEditor, unit.Dp(200)),
-					}
-
-					// (optional) handle editor updates while laid out
-					s.handleNewProfileEditorUpdates(gtx)
-
-					return material.List(s.theme, s.list).Layout(gtx, len(form), func(gtx C, i int) D {
-						return layout.UniformInset(unit.Dp(16)).Layout(gtx, form[i])
-					})
-				}),
-
-				// BOTTOM: fixed action bar (Save/Cancel + error)
-				layout.Rigid(func(gtx C) D {
-					// Optional background for the bar
-					// paint.Fill(gtx.Ops, color.NRGBA{A:0xFF, R:24, G:24, B:28})
-
-					return layout.Inset{
-						Top: unit.Dp(8), Left: unit.Dp(16), Right: unit.Dp(16), Bottom: unit.Dp(16),
-					}.Layout(gtx, func(gtx C) D {
-						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-							// Buttons row
-							layout.Rigid(func(gtx C) D {
-								return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
-									layout.Rigid(func(gtx C) D {
-										return s.renderButton(gtx, "Save", PurpleColor, s.saveButton, func() { s.saveProfile(ctx) })
-									}),
-									layout.Rigid(func(gtx C) D {
-										return layout.Inset{Left: unit.Dp(12)}.Layout(gtx, func(gtx C) D {
-											return s.renderButton(gtx, "Cancel", GreyColor, s.cancelButton, func() {
-												if len(s.profiles.profiles) != 0 {
-													s.currentUiMode = viewProfileUiMode
-												}
-											})
-										})
-									}),
-									// spacer to take remaining width (keeps buttons left-aligned)
-									layout.Flexed(1, func(gtx C) D { return layout.Spacer{}.Layout(gtx) }),
-								)
-							}),
-
-							// Error message under buttons
-							layout.Rigid(func(gtx C) D {
-								return layout.Inset{Top: unit.Dp(8)}.Layout(gtx, func(gtx C) D {
-									return s.renderErrorMessage(gtx, "this is an error message")
-								})
-							}),
-						)
-					})
-				}),
-			)
+			return s.renderNewProfileContent(ctx, gtx)
 		}),
 	)
 }
 
-// Replaces the separate label/editor widgets with a grouped field
+// renderNewProfileContent contains the form and action bar
+func (s *State) renderNewProfileContent(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+		layout.Flexed(1, func(gtx C) D {
+			return s.renderProfileForm(gtx)
+		}),
+		layout.Rigid(func(gtx C) D {
+			return s.renderFormActionBar(ctx, gtx)
+		}),
+	)
+}
+
+// renderProfileForm displays the scrollable form with name and config fields
+func (s *State) renderProfileForm(gtx layout.Context) layout.Dimensions {
+	form := []layout.Widget{
+		func(gtx C) D { return s.renderSpacer(gtx, unit.Dp(16)) },
+		s.formField("Name", s.profileNameEditor, unit.Dp(80)),
+		s.formField("Config", s.configEditor, unit.Dp(200)),
+	}
+
+	s.handleProfileEditorUpdates(gtx)
+
+	return material.List(s.theme, s.sidebarProfilesList).Layout(gtx, len(form), func(gtx C, i int) D {
+		return layout.UniformInset(unit.Dp(16)).Layout(gtx, form[i])
+	})
+}
+
+// renderFormActionBar shows Save/Cancel buttons and error messages
+func (s *State) renderFormActionBar(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	return layout.Inset{
+		Top: unit.Dp(8), Left: unit.Dp(16),
+		Right: unit.Dp(16), Bottom: unit.Dp(16),
+	}.Layout(gtx, func(gtx C) D {
+		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+			layout.Rigid(func(gtx C) D {
+				return s.renderFormButtons(ctx, gtx)
+			}),
+			layout.Rigid(func(gtx C) D {
+				return s.renderFormErrorSection(gtx)
+			}),
+		)
+	})
+}
+
+// renderFormButtons displays the Save and Cancel buttons
+func (s *State) renderFormButtons(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+		layout.Rigid(func(gtx C) D {
+			return s.renderSaveButton(ctx, gtx)
+		}),
+		layout.Rigid(func(gtx C) D {
+			return s.renderCancelButton(ctx, gtx)
+		}),
+		layout.Rigid(func(gtx C) D {
+			if s.currentUiMode == newProfileUiMode {
+				return D{}
+			} else {
+				return s.renderDeleteButton(ctx, gtx)
+			}
+		}),
+		layout.Flexed(1, func(gtx C) D {
+			return layout.Spacer{}.Layout(gtx)
+		}),
+	)
+}
+
+// renderDeleteButton shows the delete profile button
+func (s *State) renderDeleteButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	onClick := func() {
+		s.deleteProfile(ctx)
+
+		if len(s.profiles.profiles) == 0 {
+			s.currentUiMode = newProfileUiMode
+			s.profileNameEditor.SetText("")
+			s.configEditor.SetText("")
+		} else {
+			s.currentUiMode = viewProfileUiMode
+		}
+	}
+
+	return layout.Inset{Left: unit.Dp(12)}.Layout(gtx, func(gtx C) D {
+		return s.renderButton(gtx, "Delete", RedColor, s.deleteButton, onClick)
+	})
+}
+
+// renderSaveButton shows the save button
+func (s *State) renderSaveButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	onClick := func() {
+		s.saveProfile(ctx)
+	}
+	return s.renderButton(gtx, "Save", PurpleColor, s.saveButton, onClick)
+}
+
+// renderCancelButton shows the cancel button
+func (s *State) renderCancelButton(ctx context.Context, gtx layout.Context) layout.Dimensions {
+	onClick := func() {
+		if len(s.profiles.profiles) != 0 {
+			s.currentUiMode = viewProfileUiMode
+		}
+	}
+
+	return layout.Inset{Left: unit.Dp(12)}.Layout(gtx, func(gtx C) D {
+		return s.renderButton(gtx, "Cancel", GreyColor, s.cancelButton, onClick)
+	})
+}
+
+// renderFormErrorSection displays error messages
+func (s *State) renderFormErrorSection(gtx layout.Context) layout.Dimensions {
+	return layout.Inset{Top: unit.Dp(8)}.Layout(gtx, func(gtx C) D {
+		return s.renderErrorMessage(gtx, "this is an error message")
+	})
+}
+
+// formField creates a labeled form field with an editor
 func (s *State) formField(label string, ed *widget.Editor, h unit.Dp) layout.Widget {
 	return func(gtx C) D {
 		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-			// Label (left-aligned) with a small gap to the editor
 			layout.Rigid(func(gtx C) D {
-				l := material.Label(s.theme, 16, label)
-				l.Color = WhiteColor
-				l.Alignment = text.Start // left align
-				return layout.Inset{Bottom: unit.Dp(4)}.Layout(gtx, l.Layout)
+				return s.renderFieldLabel(gtx, label)
 			}),
-			// Editor
 			layout.Rigid(func(gtx C) D {
 				return s.renderTextEditor(gtx, ed, "", h)
 			}),
@@ -103,64 +154,96 @@ func (s *State) formField(label string, ed *widget.Editor, h unit.Dp) layout.Wid
 	}
 }
 
-func (s *State) saveProfile(ctx context.Context) {
-	profileName := s.profileNameEditor.Text()
-	configContent := s.configEditor.Text()
+// renderFieldLabel displays a form field label
+func (s *State) renderFieldLabel(gtx layout.Context, label string) layout.Dimensions {
+	l := material.Label(s.theme, 16, label)
+	l.Color = WhiteColor
+	l.Alignment = text.Start
+	return layout.Inset{Bottom: unit.Dp(4)}.Layout(gtx, l.Layout)
+}
 
-	// TODO if editProfileUiMode, and name is changed, change the config filename
+// handleProfileEditorUpdates processes editor events
+func (s *State) handleProfileEditorUpdates(gtx layout.Context) {
+	s.handleEditorUpdates(s.profileNameEditor, gtx)
+	s.handleEditorUpdates(s.configEditor, gtx)
+}
 
-	if profileName == "" || configContent == "" {
-		s.errLogger.Printf("Profile name or config content is empty")
-		return
-	}
-
-	// Create .wgu directory if it doesn't exist
-	if err := os.MkdirAll(s.wguDir, 0755); err != nil {
-		s.errLogger.Printf("Error creating .wgu directory: %v", err)
-		return
-	}
-
-	// Create the config file path
-	configPath := filepath.Join(s.wguDir, profileName+".conf")
-
-	// Write the config to file
-	if err := os.WriteFile(configPath, []byte(configContent), 0600); err != nil {
-		s.errLogger.Printf("Error saving config file: %v", err)
-		return
-	}
-
-	// Clear the editors
-	s.profileNameEditor.SetText("")
-	s.configEditor.SetText("")
-
-	// Refresh the profiles list
-	err := s.RefreshProfiles(ctx)
-	if err != nil {
-		s.errLogger.Printf("failed to refresh profile - %v", err)
-	}
-
-	// Switch to the newly created profile (it will be in the sorted list, not at the end)
-	for i, profile := range s.profiles.profiles {
-		if profile.name == profileName {
-			s.profiles.selectedIndex = i
-			s.currentUiMode = viewProfileUiMode
+// handleEditorUpdates consumes all pending updates for an editor
+func (s *State) handleEditorUpdates(ed *widget.Editor, gtx layout.Context) {
+	for {
+		_, ok := ed.Update(gtx)
+		if !ok {
 			break
 		}
 	}
 }
-func (s *State) handleNewProfileEditorUpdates(gtx layout.Context) {
-	// Profile name editor updates
-	for {
-		_, ok := s.profileNameEditor.Update(gtx)
-		if !ok {
-			break
-		}
+
+// saveProfile validates and saves the profile configuration
+func (s *State) saveProfile(ctx context.Context) {
+	profileName := s.profileNameEditor.Text()
+	configContent := s.configEditor.Text()
+
+	if !s.validateProfileInput(profileName, configContent) {
+		return
 	}
 
-	// Config editor updates
-	for {
-		_, ok := s.configEditor.Update(gtx)
-		if !ok {
+	if err := s.ensureWguDirectory(); err != nil {
+		return
+	}
+
+	configPath := filepath.Join(s.wguDir, profileName+".conf")
+	if err := s.writeConfigFile(configPath, configContent); err != nil {
+		return
+	}
+
+	s.clearEditors()
+	s.refreshAndSelectProfile(ctx, profileName)
+}
+
+// validateProfileInput checks if profile name and config are valid
+func (s *State) validateProfileInput(name, config string) bool {
+	if name == "" || config == "" {
+		s.errLogger.Printf("Profile name or config content is empty")
+		return false
+	}
+	return true
+}
+
+// ensureWguDirectory creates the .wgu directory if it doesn't exist
+func (s *State) ensureWguDirectory() error {
+	if err := os.MkdirAll(s.wguDir, 0755); err != nil {
+		s.errLogger.Printf("Error creating .wgu directory: %v", err)
+		return err
+	}
+	return nil
+}
+
+// writeConfigFile saves the config content to a file
+func (s *State) writeConfigFile(path, content string) error {
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		s.errLogger.Printf("Error saving config file: %v", err)
+		return err
+	}
+	return nil
+}
+
+// clearEditors resets both editors to empty
+func (s *State) clearEditors() {
+	s.profileNameEditor.SetText("")
+	s.configEditor.SetText("")
+}
+
+// refreshAndSelectProfile refreshes profiles and switches to the new one
+func (s *State) refreshAndSelectProfile(ctx context.Context, profileName string) {
+	if err := s.RefreshProfiles(ctx); err != nil {
+		s.errLogger.Printf("failed to refresh profile - %v", err)
+		return
+	}
+
+	for i, profile := range s.profiles.profiles {
+		if profile.name == profileName {
+			s.profiles.selectedIndex = i
+			s.currentUiMode = viewProfileUiMode
 			break
 		}
 	}
