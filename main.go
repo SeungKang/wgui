@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 	"flag"
+	"gioui.org/app"
+	"gioui.org/unit"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"gioui.org/app"
-	"gioui.org/unit"
 )
 
 func main() {

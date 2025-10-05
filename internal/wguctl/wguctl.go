@@ -31,7 +31,7 @@ func (o *Config) GetExePath() string {
 }
 
 func StartWgu(ctx context.Context, config Config) (*Wgu, error) {
-	wgu := exec.CommandContext(ctx, config.ExePath, "up", "-c", config.ConfigPath)
+	wgu := exec.CommandContext(ctx, config.ExePath, "up", "-c", config.ConfigPath) // TODO should this be config.GetExePath()?
 
 	stdout, err := wgu.StdoutPipe()
 	if err != nil {

@@ -21,17 +21,20 @@ type FsmConfig struct {
 }
 
 func NewFsm(ctx context.Context, config FsmConfig) *Fsm {
+	wctx, cancelFn := context.WithCancel(ctx)
+
 	fsm := &Fsm{
 		config:   config,
 		events:   make(chan interface{}, 10),
 		state:    DisconnectedFsmState,
 		stderrCh: make(chan string),
 		done:     make(chan struct{}),
+		cancelFn: cancelFn,
 	}
 
-	go fsm.loop(ctx)
+	go fsm.loop(wctx)
 
-	go fsm.handleStderr(ctx)
+	go fsm.handleStderr(wctx)
 
 	return fsm
 }
@@ -47,6 +50,7 @@ type Fsm struct {
 	stderr     string
 	stderrCh   chan string
 	done       chan struct{}
+	cancelFn   func()
 }
 
 func (o *Fsm) Connect(ctx context.Context, config Config) error {
@@ -64,6 +68,15 @@ func (o *Fsm) Disconnect(ctx context.Context) error {
 		return ctx.Err()
 	case o.events <- disconnectFsmEvent{}:
 		return nil
+	}
+}
+
+func (o *Fsm) Destroy(ctx context.Context) {
+	o.cancelFn()
+
+	select {
+	case <-ctx.Done():
+	case <-o.done:
 	}
 }
 

@@ -142,15 +142,21 @@ func (s *State) renderLogsSection(gtx layout.Context) layout.Dimensions {
 
 // renderActionBar contains buttons and error messages
 func (s *State) renderActionBar(ctx context.Context, gtx layout.Context) layout.Dimensions {
-	return layout.Inset{
+	inset := layout.Inset{
 		Top: unit.Dp(16), Left: unit.Dp(16),
 		Right: unit.Dp(16), Bottom: unit.Dp(16),
-	}.Layout(gtx, func(gtx C) D {
+	}
+
+	return inset.Layout(gtx, func(gtx C) D {
 		return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 			layout.Rigid(func(gtx C) D {
 				return s.renderActionButtons(ctx, gtx)
 			}),
 			layout.Rigid(func(gtx C) D {
+				// Reserve consistent space for error message
+				minHeight := gtx.Dp(unit.Dp(32)) // adjust as needed (24–32dp looks good)
+				gtx.Constraints.Min.Y = minHeight
+
 				return s.renderErrorSection(gtx)
 			}),
 		)
@@ -256,6 +262,7 @@ func (s *State) switchToEditMode() {
 	s.currentUiMode = editProfileUiMode
 	s.profileNameEditor.SetText(s.profiles.selected().name)
 	s.configEditor.SetText(s.profiles.selected().lastReadConfig)
+	s.errLabel = ""
 }
 
 // deleteProfile removes the profile config and refreshes the list

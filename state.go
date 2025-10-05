@@ -33,6 +33,7 @@ type State struct {
 	copiedMessageTime time.Time
 	connectButton     *widget.Clickable
 	editButton        *widget.Clickable
+	errorSelectable   *widget.Selectable
 	logsList          *widget.List
 	logSelectables    *widget.Selectable
 
@@ -44,10 +45,11 @@ type State struct {
 	deleteButton      *widget.Clickable
 
 	// window
-	theme *material.Theme
-	win   *app.Window
+	theme    *material.Theme
+	win      *app.Window
+	errLabel string
 
-	wguDir        string
+	wguConfDir    string
 	wguExePath    string
 	errLogger     *log.Logger
 	currentUiMode uiMode
@@ -137,9 +139,10 @@ func NewState(ctx context.Context, w *app.Window) *State {
 				Axis: layout.Vertical,
 			},
 		},
-		copyIconButton: new(widget.Clickable),
-		connectButton:  new(widget.Clickable),
-		editButton:     new(widget.Clickable),
+		copyIconButton:  new(widget.Clickable),
+		connectButton:   new(widget.Clickable),
+		editButton:      new(widget.Clickable),
+		errorSelectable: new(widget.Selectable),
 		logsList: &widget.List{
 			List: layout.List{
 				Axis:        layout.Vertical,
@@ -147,7 +150,7 @@ func NewState(ctx context.Context, w *app.Window) *State {
 			},
 		},
 		logSelectables:    new(widget.Selectable),
-		profileNameEditor: new(widget.Editor),
+		profileNameEditor: &widget.Editor{SingleLine: true},
 		configEditor:      new(widget.Editor),
 		saveButton:        new(widget.Clickable),
 		cancelButton:      new(widget.Clickable),
@@ -158,13 +161,22 @@ func NewState(ctx context.Context, w *app.Window) *State {
 			profileList: &widget.List{List: layout.List{Axis: layout.Vertical}},
 			events:      make(chan profileEvent),
 		},
-		wguDir:        filepath.Join(homeDir, ".wgu"),
+		wguConfDir:    filepath.Join(homeDir, ".wgu"),
 		wguExePath:    wguPath,
 		errLogger:     log.Default(),
 		currentUiMode: newProfileUiMode,
 	}
 
 	s.theme.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
+
+	err = checkWguConf(ctx, wguctl.Config{
+		ExePath:    s.wguExePath,
+		ConfigPath: s.wguConfDir,
+	})
+	if err != nil {
+		// TODO handle errors so that program doesn't just exist when error
+		panic(err)
+	}
 
 	err = s.loadProfiles(ctx)
 	if err != nil {
@@ -176,6 +188,29 @@ func NewState(ctx context.Context, w *app.Window) *State {
 	}
 
 	return s
+}
+
+func checkWguConf(ctx context.Context, config wguctl.Config) error {
+	// Ensure .wgu directory exists
+	err := os.MkdirAll(config.ConfigPath, 0700)
+	if err != nil {
+		return fmt.Errorf("failed to create directory %s - %w", config.ConfigPath, err)
+	}
+
+	// Read all .conf paths from the directory
+	paths, err := filepath.Glob(filepath.Join(config.ConfigPath, "*.conf"))
+	if err != nil {
+		return fmt.Errorf("failed to get all .conf paths - %v", err)
+	}
+
+	if len(paths) == 0 {
+		err = wguctl.CreateConfig(ctx, config, "default")
+		if err != nil {
+			return fmt.Errorf("failed to get create default config - %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *State) Run(ctx context.Context, w *app.Window) error {
@@ -228,40 +263,56 @@ func (s *State) Run(ctx context.Context, w *app.Window) error {
 }
 
 func (s *State) loadProfiles(ctx context.Context) error {
-	// Ensure .wgu directory exists
-	err := os.MkdirAll(s.wguDir, 0700)
-	if err != nil {
-		return fmt.Errorf("failed to create directory %s - %w", s.wguDir, err)
-	}
-
 	// Read all .conf paths from the directory
-	paths, err := filepath.Glob(filepath.Join(s.wguDir, "*.conf"))
+	paths, err := filepath.Glob(filepath.Join(s.wguConfDir, "*.conf"))
 	if err != nil {
 		return fmt.Errorf("failed to get all .conf paths - %v", err)
 	}
 
-	// Extract profile names and sort them consistently
 	var profileConfigs []profileConfig
 
-	for _, path := range paths {
-		baseName := filepath.Base(path)
-		profileName := strings.TrimSuffix(baseName, ".conf")
-		config := profileConfig{
-			name:       profileName,
-			configPath: path,
-			wgu: wguctl.NewFsm(ctx, wguctl.FsmConfig{
-				OnNewStderr: func(ctx context.Context) {
-					select {
-					case <-ctx.Done():
-					case s.profiles.events <- profileEvent{name: profileName}:
-					}
-				},
-			}),
+	visited := make([]bool, len(s.profiles.profiles))
+
+	hasConfig := func(targetPath string) (bool, *profileConfig) {
+		for i, profile := range s.profiles.profiles {
+			if profile.configPath == targetPath {
+				visited[i] = true
+				return true, &profile
+			}
 		}
 
-		config.refresh(ctx, s.wguExePath, s.errLogger)
+		return false, nil
+	}
 
-		profileConfigs = append(profileConfigs, config)
+	for _, path := range paths {
+		hasIt, existingConfig := hasConfig(path)
+		if hasIt {
+			profileConfigs = append(profileConfigs, *existingConfig)
+		} else {
+			baseName := filepath.Base(path)
+			profileName := strings.TrimSuffix(baseName, ".conf")
+
+			profileConfigs = append(profileConfigs, profileConfig{
+				name:       profileName,
+				configPath: path,
+				wgu: wguctl.NewFsm(ctx, wguctl.FsmConfig{
+					OnNewStderr: func(ctx context.Context) {
+						select {
+						case <-ctx.Done():
+						case s.profiles.events <- profileEvent{name: profileName}:
+						}
+					},
+				}),
+			})
+		}
+
+		profileConfigs[len(profileConfigs)-1].refresh(ctx, s.wguExePath, s.errLogger)
+	}
+
+	for i, wasVisited := range visited {
+		if !wasVisited {
+			s.profiles.profiles[i].wgu.Destroy(ctx)
+		}
 	}
 
 	// Ensure consistent ordering

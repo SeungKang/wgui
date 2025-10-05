@@ -86,6 +86,7 @@ func (s *State) renderSidebarButtons(ctx context.Context, gtx layout.Context) la
 			for s.newProfileButton.Clicked(gtx) {
 				s.profileNameEditor.SetText("")
 				s.configEditor.SetText("")
+				s.errLabel = ""
 				s.currentUiMode = newProfileUiMode
 				s.win.Invalidate()
 			}
@@ -196,6 +197,7 @@ func (s *State) renderLogs(gtx layout.Context) layout.Dimensions {
 func (s *State) renderErrorMessage(gtx layout.Context, message string) layout.Dimensions {
 	errorMessage := material.Label(s.theme, 12, message)
 	errorMessage.Color = RedColor
+	errorMessage.State = s.errorSelectable
 	return errorMessage.Layout(gtx)
 }
 

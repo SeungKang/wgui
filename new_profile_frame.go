@@ -43,8 +43,8 @@ func (s *State) renderNewProfileContent(ctx context.Context, gtx layout.Context)
 func (s *State) renderProfileForm(gtx layout.Context) layout.Dimensions {
 	form := []layout.Widget{
 		func(gtx C) D { return s.renderSpacer(gtx, unit.Dp(16)) },
-		s.formField("Name", s.profileNameEditor, unit.Dp(80)),
-		s.formField("Config", s.configEditor, unit.Dp(200)),
+		s.formField("Name", s.profileNameEditor, unit.Dp(30)),
+		s.formField("Config", s.configEditor, unit.Dp(300)),
 	}
 
 	s.handleProfileEditorUpdates(gtx)
@@ -103,6 +103,7 @@ func (s *State) renderDeleteButton(ctx context.Context, gtx layout.Context) layo
 			s.profileNameEditor.SetText("")
 			s.configEditor.SetText("")
 		} else {
+			s.profiles.selectedIndex = 0
 			s.currentUiMode = viewProfileUiMode
 		}
 	}
@@ -136,7 +137,7 @@ func (s *State) renderCancelButton(ctx context.Context, gtx layout.Context) layo
 // renderFormErrorSection displays error messages
 func (s *State) renderFormErrorSection(gtx layout.Context) layout.Dimensions {
 	return layout.Inset{Top: unit.Dp(8)}.Layout(gtx, func(gtx C) D {
-		return s.renderErrorMessage(gtx, "this is an error message")
+		return s.renderErrorMessage(gtx, s.errLabel)
 	})
 }
 
@@ -191,7 +192,7 @@ func (s *State) saveProfile(ctx context.Context) {
 		return
 	}
 
-	configPath := filepath.Join(s.wguDir, profileName+".conf")
+	configPath := filepath.Join(s.wguConfDir, profileName+".conf")
 	if err := s.writeConfigFile(configPath, configContent); err != nil {
 		return
 	}
@@ -202,16 +203,30 @@ func (s *State) saveProfile(ctx context.Context) {
 
 // validateProfileInput checks if profile name and config are valid
 func (s *State) validateProfileInput(name, config string) bool {
-	if name == "" || config == "" {
-		s.errLogger.Printf("Profile name or config content is empty")
+	if name == "" && config == "" {
+		s.errLabel = "Please enter a profile name and config file"
+		s.errLogger.Printf("Profile name and config content are empty")
 		return false
 	}
+
+	if name == "" {
+		s.errLabel = "Please enter a profile name"
+		s.errLogger.Printf("Profile name is empty")
+		return false
+	}
+
+	if config == "" {
+		s.errLabel = "Please enter a config file"
+		s.errLogger.Printf("Config content is empty")
+		return false
+	}
+
 	return true
 }
 
 // ensureWguDirectory creates the .wgu directory if it doesn't exist
 func (s *State) ensureWguDirectory() error {
-	if err := os.MkdirAll(s.wguDir, 0755); err != nil {
+	if err := os.MkdirAll(s.wguConfDir, 0755); err != nil {
 		s.errLogger.Printf("Error creating .wgu directory: %v", err)
 		return err
 	}
