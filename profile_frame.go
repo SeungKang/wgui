@@ -2,20 +2,21 @@ package main
 
 import (
 	"context"
-	"gioui.org/io/clipboard"
-	"golang.org/x/exp/shiny/materialdesign/icons"
 	"image/color"
 	"io"
 	"os"
 	"strings"
 	"time"
-	"wugui/internal/wguctl"
 
+	"github.com/SeungKang/wgui/internal/wguctl"
+
+	"gioui.org/io/clipboard"
 	"gioui.org/layout"
 	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
+	"golang.org/x/exp/shiny/materialdesign/icons"
 )
 
 // renderProfileFrame is the main layout with sidebar and content area

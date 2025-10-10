@@ -9,7 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"wugui/internal/wguctl"
+
+	"github.com/SeungKang/wgui/internal/wguctl"
 
 	"gioui.org/app"
 	"gioui.org/font/gofont"

@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"flag"
-	"gioui.org/app"
-	"gioui.org/unit"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"gioui.org/app"
+	"gioui.org/unit"
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 		w := new(app.Window)
 		w.Option(
 			app.Size(unit.Dp(800), unit.Dp(600)),
-			app.Title("wugui"),
+			app.Title("wgui"),
 		)
 
 		s := NewState(ctx, w)

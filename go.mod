@@ -1,4 +1,4 @@
-module wugui
+module github.com/SeungKang/wgui
 
 go 1.23.7
 

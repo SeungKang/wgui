@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"golang.org/x/exp/shiny/materialdesign/icons"
 	"image"
 	"image/color"
+
+	"golang.org/x/exp/shiny/materialdesign/icons"
 
 	"gioui.org/layout"
 	"gioui.org/op/clip"
