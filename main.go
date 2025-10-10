@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -12,6 +13,8 @@ import (
 	"gioui.org/app"
 	"gioui.org/unit"
 )
+
+const version = "v0.0.1"
 
 func main() {
 	flag.Parse()
@@ -24,7 +27,7 @@ func main() {
 		w := new(app.Window)
 		w.Option(
 			app.Size(unit.Dp(800), unit.Dp(600)),
-			app.Title("wgui"),
+			app.Title(fmt.Sprintf("wgui [%s]", version)),
 		)
 
 		s := NewState(ctx, w)
