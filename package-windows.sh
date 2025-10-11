@@ -36,4 +36,6 @@ innosetup_args="\"${innosetup_args//$'\n'/\" \"}\""
 
 bat_file_path="${build_dir}/package.bat"
 echo "ISCC.exe ${innosetup_args}" > "${bat_file_path}"
-(cd "${build_dir}" && cmd //c "${bat_file_path##*/}")
+(cd "${build_dir}" && cmd //c "${bat_file_path##*/}") 1>&2
+
+find "${build_dir}" -maxdepth 1 -type f -iname '*-installer*'

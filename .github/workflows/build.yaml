@@ -21,8 +21,7 @@ jobs:
           export VERSION=0.0.1
           [ "${GITHUB_REF_TYPE}" == "tag" ] && VERSION="${GITHUB_REF_NAME}"
           ./build-windows.sh
-          ./package-windows.sh
-          installer_path=build/wgui-installer-${VERSION}.exe
+          installer_path="$(./package-windows.sh)"
           echo "installer_path=${installer_path}" >> "${GITHUB_OUTPUT}"
           echo "installer_name=${installer_path##*/}" >> "${GITHUB_OUTPUT}"
 
