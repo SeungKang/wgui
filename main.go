@@ -14,7 +14,7 @@ import (
 	"gioui.org/unit"
 )
 
-const version = "v0.0.1"
+var version = "dev"
 
 func main() {
 	flag.Parse()

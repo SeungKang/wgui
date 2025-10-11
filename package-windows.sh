@@ -11,6 +11,8 @@ fi
 
 set -eux
 
+VERSION="${VERSION##*v}"
+
 build_dir='build'
 
 cp resources/windows/installer/installer.iss "${build_dir}/"
@@ -25,7 +27,7 @@ innosetup_args=$(cat <<-END
 /DAppURLOverride=https://github.com/SeungKang/wgui
 /DAppExeNameOverride=wgui.exe
 /DAppVersionOverride=${VERSION}
-/DOutputBaseFilenameOverride=wgui-${VERSION}
+/DOutputBaseFilenameOverride=wgui-installer-${VERSION}
 installer.iss
 END
 )
