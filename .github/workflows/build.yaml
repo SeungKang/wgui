@@ -37,6 +37,7 @@ jobs:
       - name: sign installer
         id: sign
         if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
         run: |
           cosign sign-blob "${{ steps.build.outputs.installer_path }}" --yes --bundle cosign.bundle
           echo "cosign_bundle=cosign.bundle" >> "${GITHUB_OUTPUT}"
