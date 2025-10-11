@@ -63,7 +63,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Source: "{#ApplicationFilesPath}\*"; DestDir: "{app}\"; Flags: ignoreversion createallsubdirs recursesubdirs
 
 [Icons]
-;Name: "{autoprograms}\{#AppNameOverride}"; Filename: "{app}\bin\{#AppExeNameOverride}";
+Name: "{autoprograms}\{#AppNameOverride}"; Filename: "{app}\bin\{#AppExeNameOverride}";
 ;Name: "{group}\{cm:UninstallProgram,{#AppNameOverride}}"; Filename: "{uninstallexe}"
 ;Name: "{commondesktop}\{#AppNameOverride}"; Filename: "{app}\{#AppExeNameOverride}"; Tasks: desktopicon
 ;Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#AppNameOverride}"; Filename: "{app}\{#AppExeNameOverride}"; Tasks: quicklaunchicon
