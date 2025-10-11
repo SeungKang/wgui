@@ -27,8 +27,8 @@ jobs:
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ steps.build.outputs.installer_name}}
-          path: ${{ steps.build.outputs.installer_path}}
+          name: ${{ steps.build.outputs.installer_name }}
+          path: ${{ steps.build.outputs.installer_path }}
           if-no-files-found: error
 
       - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
@@ -41,11 +41,18 @@ jobs:
           cosign sign-blob "${{ steps.build.outputs.installer_path }}" --yes --bundle cosign.bundle
           echo "cosign_bundle=cosign.bundle" >> "${GITHUB_OUTPUT}"
 
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: cosign.bundle
+          path: ${{ steps.sign.outputs.cosign_bundle }}
+          if-no-files-found: error
+
       - name: release
         uses: softprops/action-gh-release@aec2ec56f94eb8180ceec724245f64ef008b89f5 # v2.4.0
         if: startsWith(github.ref, 'refs/tags/')
         with:
           fail_on_unmatched_files: true
           files: |
-            ${{ steps.build.outputs.installer_path}}
-            ${{ steps.sign.outputs.cosign_bundle}}
+            ${{ steps.build.outputs.installer_path }}
+            ${{ steps.sign.outputs.cosign_bundle }}
