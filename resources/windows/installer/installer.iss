@@ -61,9 +61,11 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 Source: "{#ApplicationFilesPath}\*"; DestDir: "{app}\"; Flags: ignoreversion createallsubdirs recursesubdirs
+; Copy the icon into the app folder
+Source: "images\wgui.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\{#AppNameOverride}"; Filename: "{app}\{#AppExeNameOverride}";
+Name: "{autoprograms}\{#AppNameOverride}"; Filename: "{app}\{#AppExeNameOverride}"; IconFilename: "{app}\wgui.ico"
 ;Name: "{group}\{cm:UninstallProgram,{#AppNameOverride}}"; Filename: "{uninstallexe}"
 ;Name: "{commondesktop}\{#AppNameOverride}"; Filename: "{app}\{#AppExeNameOverride}"; Tasks: desktopicon
 ;Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#AppNameOverride}"; Filename: "{app}\{#AppExeNameOverride}"; Tasks: quicklaunchicon

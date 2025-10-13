@@ -17,6 +17,8 @@ build_dir='build'
 
 cp resources/windows/installer/installer.iss "${build_dir}/"
 
+cp -r resources/images "${build_dir}/"
+
 # TODO: Add license for Windows installer.
 # '/DLicenseFileOverride=license_en_US.txt'
 innosetup_args=$(cat <<-END
