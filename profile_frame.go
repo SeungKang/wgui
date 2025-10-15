@@ -93,6 +93,7 @@ func (s *State) renderCopyButton(gtx layout.Context) layout.Dimensions {
 				btn.Size = unit.Dp(16)
 				btn.Inset = layout.UniformInset(unit.Dp(2))
 				btn.Description = "copy public key to clipboard"
+				btn.Background = PinkColor
 				return btn.Layout(gtx)
 			}),
 			layout.Rigid(func(gtx C) D {

@@ -150,6 +150,7 @@ func NewState(ctx context.Context, w *app.Window) *State {
 				ScrollToEnd: true,
 			},
 		},
+		pubkeySelectable:  new(widget.Selectable),
 		logSelectables:    new(widget.Selectable),
 		profileNameEditor: &widget.Editor{SingleLine: true},
 		configEditor:      new(widget.Editor),

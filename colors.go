@@ -13,4 +13,5 @@ var (
 	GreenColor     = color.NRGBA{A: 0xff, R: 59, G: 125, B: 35}
 	DarkGreenColor = color.NRGBA{A: 0xff, R: 39, G: 83, B: 23}
 	LightGreyColor = color.NRGBA{A: 0xff, R: 210, G: 210, B: 210}
+	PinkColor      = color.NRGBA{A: 0xff, R: 220, G: 138, B: 255}
 )
