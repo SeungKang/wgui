@@ -13,11 +13,10 @@
 
 ## Installation
 
-See [Verification](#Verification) for instructions on confirming the installer’s authenticity.
-
 1. Download and run the wgui-installer-X.X.X.exe from the latest
 [![GitHub release](https://img.shields.io/github/release/SeungKang/wgui.svg)](https://github.com/SeungKang/wgui/releases/latest)
-2. Once the installation completes, `wgui` will be available from your Start menu
+2. (Optional) Verify the installer authenticity using the steps in the next section
+3. Once the installation completes, `wgui` will be available from your Start menu
 
 ### Installer Verification
 
