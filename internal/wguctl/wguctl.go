@@ -14,6 +14,7 @@ import (
 type Wgu struct {
 	once    sync.Once
 	process *exec.Cmd
+	stdin   io.WriteCloser
 }
 
 type Config struct {
@@ -32,6 +33,11 @@ func (o *Config) GetExePath() string {
 
 func StartWgu(ctx context.Context, config Config) (*Wgu, error) {
 	wgu := exec.CommandContext(ctx, config.ExePath, "up", "-c", config.ConfigPath) // TODO should this be config.GetExePath()?
+
+	stdin, err := wgu.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdin pipe - %w", err)
+	}
 
 	stdout, err := wgu.StdoutPipe()
 	if err != nil {
@@ -109,10 +115,11 @@ func StartWgu(ctx context.Context, config Config) (*Wgu, error) {
 			return nil, fmt.Errorf("failed to get 'ready' result - %w", err)
 		}
 
-		return &Wgu{process: wgu}, nil
+		return &Wgu{process: wgu, stdin: stdin}, nil
 	}
 }
 
 func (o *Wgu) Stop() error {
+	o.stdin.Close()
 	return o.process.Process.Kill()
 }
