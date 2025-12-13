@@ -4,19 +4,15 @@ set -e
 
 # Configuration
 APP_NAME="wgui"
-VERSION="${VERSION:0.0.1}"
+VERSION="${VERSION:-0.0.1}"
 GROUP="com.github.SeungKang"
 APPLICATION_ID="${GROUP}.${APP_NAME}"
-PUBLISHER="Seung Kang"
-PROJECT_URL="https://github.com/SeungKang/${APP_NAME}"
-BUNDLE_SIGNATURE="${APP_NAME}"
 
 # Directories
 SCRIPT_PATH=$(realpath "$0")
 SCRIPT_DIR=$(dirname "${SCRIPT_PATH}")
 BUILD_DIR="${SCRIPT_DIR}/build"
 RESOURCES_DIR="${SCRIPT_DIR}/resources"
-APP_RESOURCES_DIR="${RESOURCES_DIR}/application"
 INSTALLER_RESOURCES_DIR="${RESOURCES_DIR}/installer"
 APP_CLEANROOM_DIR="${BUILD_DIR}/app-cleanroom"
 INSTALLER_CLEANROOM_DIR="${BUILD_DIR}/installer-cleanroom"
@@ -26,13 +22,9 @@ MACOS_APP_DIR="${APP_CLEANROOM_DIR}/${APP_NAME}.app"
 INSTALLER_PREFIX="${APP_NAME}-${VERSION}"
 FINAL_PKG="${BUILD_DIR}/${INSTALLER_PREFIX}.pkg"
 
-# Go build flags
-LDFLAGS="-X main.version=${VERSION}"
-
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
@@ -63,71 +55,26 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
 fi
 
 # Check for required tools
-for tool in go pkgbuild productbuild; do
+for tool in pkgbuild productbuild; do
     if ! command -v $tool &> /dev/null; then
         log_error "$tool is required but not installed"
         exit 1
     fi
 done
 
-# Create build directories
-log_step "Creating build directories..."
-mkdir -p "$BUILD_DIR"
-mkdir -p "$APP_CLEANROOM_DIR"
+# Verify .app bundle exists
+if [ ! -d "$MACOS_APP_DIR" ]; then
+    log_error ".app bundle not found: $MACOS_APP_DIR"
+    log_error "Please run build-app.sh first to create the .app bundle"
+    exit 1
+fi
+
+# Create installer cleanroom directory
+log_step "Creating installer directories..."
 mkdir -p "$INSTALLER_CLEANROOM_DIR"
 
-# Build Go executable for macOS
-log_step "Building Go executable for macOS (amd64)..."
-cd "$SCRIPT_DIR"
-GOOS=darwin GOARCH=arm64 go build \
-    -ldflags "$LDFLAGS" \
-    -o "${BUILD_DIR}/${APP_NAME}-darwin-arm64"
-
-if [ ! -f "${BUILD_DIR}/${APP_NAME}-darwin-arm64" ]; then
-    log_error "Failed to build executable"
-    exit 1
-fi
-
-log_info "✓ Executable built successfully"
-
-# Create .app bundle structure
-log_step "Creating macOS .app bundle..."
-CONTENTS_DIR="${MACOS_APP_DIR}/Contents"
-MACOS_DIR="${CONTENTS_DIR}/MacOS"
-RESOURCES_DIR_APP="${CONTENTS_DIR}/Resources"
-
-mkdir -p "$MACOS_DIR"
-mkdir -p "$RESOURCES_DIR_APP"
-
-# Create PkgInfo
-echo -n "APPL${BUNDLE_SIGNATURE}" > "${CONTENTS_DIR}/PkgInfo"
-
-# Copy executable
-cp "${BUILD_DIR}/${APP_NAME}-darwin-arm64" "${MACOS_DIR}/${APP_NAME}"
-chmod +x "${MACOS_DIR}/${APP_NAME}"
-
-# Copy and update Info.plist
-log_step "Updating Info.plist..."
-INFO_PLIST_SOURCE="${APP_RESOURCES_DIR}/macos/Info.plist"
-
-if [ ! -f "$INFO_PLIST_SOURCE" ]; then
-    log_error "Info.plist not found: $INFO_PLIST_SOURCE"
-    exit 1
-fi
-
-cp "$INFO_PLIST_SOURCE" "${CONTENTS_DIR}/Info.plist"
-
-# Replace placeholders in Info.plist
-sed -i '' "s/APP_NAME/${APP_NAME}/g" "${CONTENTS_DIR}/Info.plist"
-sed -i '' "s/IDENTIFIER/${APPLICATION_ID}/g" "${CONTENTS_DIR}/Info.plist"
-sed -i '' "s/EXECUTABLE_NAME/${APP_NAME}/g" "${CONTENTS_DIR}/Info.plist"
-sed -i '' "s/VERSION/${VERSION}/g" "${CONTENTS_DIR}/Info.plist"
-sed -i '' "s/BUNDLE_SIGNATURE/${BUNDLE_SIGNATURE}/g" "${CONTENTS_DIR}/Info.plist"
-
-log_info "✓ .app bundle created successfully"
-
 # Build installer package
-log_step "Building installer package..."
+log_step "Preparing installer resources..."
 
 # Verify installer resources exist
 MACOS_INSTALLER_FILES="${INSTALLER_RESOURCES_DIR}/macos"
@@ -154,6 +101,7 @@ if [ ! -f "$DISTRIBUTION_XML" ]; then
 fi
 
 # Update component.plist
+log_step "Updating installer configuration..."
 sed -i '' "s/APPLICATION_NAME/${APP_NAME}/g" "$COMPONENT_PLIST"
 
 # Update distribution.xml
@@ -190,11 +138,8 @@ if [ ! -f "$FINAL_PKG" ]; then
     exit 1
 fi
 
-# Cleanup
-rm -f "$APPLICATION_FILES_PKG"
-rm -rf "$MACOS_APP_DIR"
-
 log_info "✓ Installer package created successfully"
+
 echo ""
 echo -e "${GREEN}================================${NC}"
 echo -e "${GREEN}Build Complete!${NC}"
