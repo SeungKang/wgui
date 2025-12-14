@@ -44,8 +44,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          cosign sign-blob "${{ steps.build.outputs.installer_path }}" --yes --bundle cosign.bundle
-          echo "cosign_bundle=cosign.bundle" >> "${GITHUB_OUTPUT}"
+          cosign sign-blob "${{ steps.build.outputs.installer_path }}" --yes --bundle cosign.bundle.macos
+          echo "cosign_bundle=cosign.bundle.macos" >> "${GITHUB_OUTPUT}"
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: startsWith(github.ref, 'refs/tags/')
@@ -92,8 +92,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          cosign sign-blob "${{ steps.build.outputs.installer_path }}" --yes --bundle cosign.bundle
-          echo "cosign_bundle=cosign.bundle" >> "${GITHUB_OUTPUT}"
+          cosign sign-blob "${{ steps.build.outputs.installer_path }}" --yes --bundle cosign.bundle.windows
+          echo "cosign_bundle=cosign.bundle.windows" >> "${GITHUB_OUTPUT}"
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: startsWith(github.ref, 'refs/tags/')
