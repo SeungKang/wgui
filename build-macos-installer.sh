@@ -93,7 +93,7 @@ pkgbuild \
     --root "$APP_CLEANROOM_DIR" \
     --component-plist "$COMPONENT_PLIST" \
     --install-location "/Applications" \
-    "$APPLICATION_FILES_PKG"
+    "$APPLICATION_FILES_PKG" 1>&2
 
 if [ ! -f "$APPLICATION_FILES_PKG" ]; then
     exit 1
@@ -105,7 +105,7 @@ productbuild \
     --distribution "$DISTRIBUTION_XML" \
     --resources "$INSTALLER_CLEANROOM_DIR" \
     --package-path "$INSTALLER_CLEANROOM_DIR" \
-    "$FINAL_PKG"
+    "$FINAL_PKG" 1>&2
 
 if [ ! -f "$FINAL_PKG" ]; then
     exit 1
