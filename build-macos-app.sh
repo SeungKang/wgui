@@ -1,10 +1,16 @@
 #!/bin/bash
 
-set -e
+if [[ -z "${VERSION}" ]]
+then
+    echo 'the VERSION environment variable must be set'
+    exit 1
+fi
+
+set -eux
 
 # Configuration
 APP_NAME="wgui"
-VERSION="${VERSION:-0.0.1}"
+VERSION="${VERSION##*v}"
 GROUP="com.github.SeungKang"
 APPLICATION_ID="${GROUP}.${APP_NAME}"
 BUNDLE_SIGNATURE="${APP_NAME}"
@@ -21,70 +27,40 @@ MACOS_APP_DIR="${APP_CLEANROOM_DIR}/${APP_NAME}.app"
 # Go build flags
 LDFLAGS="-X main.version=${VERSION}"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
 # Check if running on macOS
 if [[ "$OSTYPE" != "darwin"* ]]; then
-    log_error "This script must be run on macOS"
     exit 1
 fi
 
 # Check for required tools
 for tool in go; do
     if ! command -v $tool &> /dev/null; then
-        log_error "$tool is required but not installed"
         exit 1
     fi
 done
 
 # Create build directories
-log_step "Creating build directories..."
 mkdir -p "$BUILD_DIR"
 mkdir -p "$APP_CLEANROOM_DIR"
 
 # Build Go executable for macOS
-log_step "Building Go executable for macOS (arm64)..."
 cd "$SCRIPT_DIR"
 GOOS=darwin GOARCH=arm64 go build \
     -ldflags "$LDFLAGS" \
     -o "${BUILD_DIR}/${APP_NAME}-darwin-arm64"
 
 if [ ! -f "${BUILD_DIR}/${APP_NAME}-darwin-arm64" ]; then
-    log_error "Failed to build executable"
     exit 1
 fi
 
-log_info "✓ Executable built successfully"
-
 # Install wgu dependency
-log_step "Installing wgu dependency..."
 GOOS=darwin GOARCH=arm64 GOBIN="${BUILD_DIR}" go install gitlab.com/stephen-fox/wgu@v0.0.11
 
 if [ ! -f "${BUILD_DIR}/wgu" ]; then
-    log_error "Failed to install wgu"
     exit 1
 fi
 
-log_info "✓ wgu installed successfully"
-
 # Create .app bundle structure
-log_step "Creating macOS .app bundle..."
 CONTENTS_DIR="${MACOS_APP_DIR}/Contents"
 MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR_APP="${CONTENTS_DIR}/Resources"
@@ -106,17 +82,13 @@ chmod +x "${MACOS_DIR}/wgu"
 # Copy icon if it exists
 ICON_FILE="${APP_RESOURCES_DIR}/macos/app.icns"
 if [ -f "$ICON_FILE" ]; then
-    log_step "Copying application icon..."
     cp "$ICON_FILE" "$RESOURCES_DIR_APP/"
-    log_info "✓ Icon copied successfully"
 fi
 
 # Copy and update Info.plist
-log_step "Updating Info.plist..."
 INFO_PLIST_SOURCE="${APP_RESOURCES_DIR}/macos/Info.plist"
 
 if [ ! -f "$INFO_PLIST_SOURCE" ]; then
-    log_error "Info.plist not found: $INFO_PLIST_SOURCE"
     exit 1
 fi
 
@@ -135,17 +107,3 @@ if [ -f "$ICON_FILE" ]; then
 else
     sed -i '' "s/ICON_NAME//g" "${CONTENTS_DIR}/Info.plist"
 fi
-
-log_info "✓ .app bundle created successfully"
-
-echo ""
-echo -e "${GREEN}================================${NC}"
-echo -e "${GREEN}.app Bundle Created!${NC}"
-echo -e "${GREEN}================================${NC}"
-echo ""
-echo "Location: ${MACOS_APP_DIR}"
-echo "Version:  ${VERSION}"
-echo ""
-echo "To build the installer, run:"
-echo "  ./build-installer.sh"
-echo ""
