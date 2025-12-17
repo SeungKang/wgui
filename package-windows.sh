@@ -29,7 +29,7 @@ innosetup_args=$(cat <<-END
 /DAppURLOverride=https://github.com/SeungKang/wgui
 /DAppExeNameOverride=wgui.exe
 /DAppVersionOverride=${VERSION}
-/DOutputBaseFilenameOverride=wgui-installer-${VERSION}
+/DOutputBaseFilenameOverride=wgui-${VERSION}-windows-x64
 installer.iss
 END
 )
@@ -40,4 +40,4 @@ bat_file_path="${build_dir}/package.bat"
 echo "ISCC.exe ${innosetup_args}" > "${bat_file_path}"
 (cd "${build_dir}" && cmd //c "${bat_file_path##*/}") 1>&2
 
-find "${build_dir}" -maxdepth 1 -type f -iname '*-installer*'
+find "${build_dir}" -maxdepth 1 -type f -iname 'wgui-*-windows-*.exe'
