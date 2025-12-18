@@ -33,14 +33,19 @@ Actions.
 [cosign]: https://docs.sigstore.dev/cosign/verifying/verify/
 
 1. Install cosign (https://docs.sigstore.dev/cosign/system_config/installation/)
-2. Download `wgui-installer-X.X.X.exe` and `cosign.bundle` from [Releases][releases]
-3. Run the commands below to verify. Note: Replace NAME-OF-RELEASE with the release # from GitHub.
+2. From the GitHub [Releases][releases] page, download the installer and matching cosign bundle for your operating system.
+3. Verify the installer using the commands below.
+   Note: Replace VERSION with the release version you downloaded.
 
 ```sh
-# Replace with the version you want to verify:
-VERSION="0.0.1"
+# Replace with the version you want to verify
+VERSION="0.0.6"
 
-cosign verify-blob "wgui-installer-${VERSION}.exe" \
+# Uncomment the installer for your operating system
+INSTALLER="wgui-${VERSION}-windows-x64.exe"
+# INSTALLER="wgui-${VERSION}-macos-arm64.pkg"
+
+cosign verify-blob "${INSTALLER}" \
   --bundle "cosign.bundle" \
   --certificate-identity="https://github.com/SeungKang/wgui/.github/workflows/build.yaml@refs/tags/v${VERSION}" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
