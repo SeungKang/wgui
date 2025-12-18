@@ -1,22 +1,26 @@
 # wgui
 
-`wgui` is a graphical user interface for [wgu][wgu] that helps you manage and control WireGuard VPN tunnels.
+`wgui` is a simple graphical user interface for [wgu][wgu] that helps you manage and control WireGuard VPN tunnels.
+
+![wgui-screenshot.png](resources/images/wgui-screenshot.png)
 
 ## Features
 
 - Create, save, and edit multiple wgu configurations
-- Easily manage multiple tunnels from the comfort of a shiny gui
+- Easily manage multiple tunnels from the comfort of a shiny gui ✨
 
 ## Supported Systems
 
-- Windows is currently supported, but it can also be built from source, see below.
+Windows and macOS are currently supported. The application can also be built from source; see [below](#installation-from-source) for details.
 
 ## Installation
 
-1. Download and run the wgui-installer-X.X.X.exe from the latest
-[![GitHub release](https://img.shields.io/github/release/SeungKang/wgui.svg)](https://github.com/SeungKang/wgui/releases/latest)
+1. Download and run installer from the latest
+   [release:](https://github.com/SeungKang/wgui/releases)
+- Windows: `wgui-X.X.X-windows-x64.exe`
+- macOS: `wgui-X.X.X-macos-arm64.pkg`
 2. (Optional) Verify the installer authenticity using the steps in the next section
-3. Once the installation completes, `wgui` will be available from your Start menu
+3. After installation completes, `wgui` will be available on your system and ready to use
 
 ### Installer Verification
 
